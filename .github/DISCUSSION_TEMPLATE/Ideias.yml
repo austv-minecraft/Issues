@@ -1,10 +1,16 @@
+name: "Nova Ideia 💡"
+description: "Sugira novas ideias para o servidor AusTV."
+title: "[Ideia] - "
 labels: ['ideia: sugerida', 'relev: não medida']
+category: "Ideais"
+
 body:
   - type: markdown
     attributes:
       value: |
-        Anote suas ideias aqui (bem formatas ou não), aqui podemos discutir com mais clareza e depois levar para um desenvolvimento.
-        Discutiremos nessa aba de discussões até que entrar no cronograma para ser implementada.
+        💬 **Compartilhe suas ideias com a equipe AusTV!**
+        Aqui você pode deixar sugestões, melhorias e conceitos (bem formatados ou não).
+        Discutiremos tudo por aqui até que a ideia entre no cronograma de desenvolvimento. 🛠️
   - type: dropdown
     id: servidor
     attributes:
@@ -30,26 +36,24 @@ body:
     attributes:
       label: Qual o propósito da ideia?
       description: |
-        Diga o porquê dessa ideia. Ela inclusive pode ser uma
-        sugestão que você viu no Discord e está implementando com ideias.
-      placeholder: Ex. Ela vai melhorar as reclamações recentes
+        Explique o porquê dessa sugestão. Pode ser algo que você viu no Discord ou algo novo que deseja implementar.
     validations:
       required: true
   - type: textarea
     attributes:
       label: Descrição da ideia
-      description: Manda a bala aqui com tudo que puder!
+      description: Detalhe tudo o que puder sobre sua proposta.
     validations:
       required: true
   - type: textarea
     attributes:
       label: Aplicação
-      description: Tem ideia de como aplicar ela ao servidor?
+      description: Tem ideia de como aplicar ela no servidor?
     validations:
       required: false
   - type: textarea
     attributes:
       label: Referências
-      description: Você tem alguma referência dessa ideia? Mande vídeos, prints, o que puder!
+      description: Inclua prints, vídeos ou links que ajudem a ilustrar sua ideia.
     validations:
       required: false
