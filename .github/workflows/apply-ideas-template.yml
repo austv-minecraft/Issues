@@ -20,39 +20,80 @@ jobs:
               uses: actions/github-script@v6
               with:
                   script: |
-                      const discussion = context.payload.discussion;
-                      const discussionNumber = discussion.number;
+                      try {
+                        console.log('Action started: apply-ideas-template');
+                        const discussion = context.payload.discussion;
+                        const discussionNumber = discussion.number;
+                        console.log('Discussion number:', discussionNumber);
 
-                      // Try to get category name from payload, fallback to API if not present
-                      let categoryName = discussion.category && discussion.category.name ? discussion.category.name : null;
-                      if (!categoryName) {
-                        const d = await github.rest.discussions.get({
+                        // Try to get category name from payload, fallback to API if not present
+                        let categoryName = discussion.category && discussion.category.name ? discussion.category.name : null;
+                        if (!categoryName) {
+                          console.log('Category not in payload, fetching discussion via API...');
+                          const d = await github.rest.discussions.get({
+                            owner: context.repo.owner,
+                            repo: context.repo.repo,
+                            discussion_number: discussionNumber
+                          });
+                          categoryName = d.data.category && d.data.category.name ? d.data.category.name : null;
+                        }
+
+                        console.log('Resolved category:', categoryName);
+                        if (!categoryName) {
+                          console.log('No category found for discussion, skipping.');
+                          return;
+                        }
+
+                        if (categoryName.toLowerCase() !== 'ideias') {
+                          console.log(`Discussion category is '${categoryName}', not 'Ideias' — skipping.`);
+                          return;
+                        }
+
+                        // Read the Ideias.yml file from the repo (we checked out the repo)
+                        const fs = require('fs');
+                        const path = require('path');
+                        const yaml = require('js-yaml');
+                        const repoRoot = process.env.GITHUB_WORKSPACE || '.';
+                        const templatePath = path.join(repoRoot, '.github', 'DISCUSSION_TEMPLATE', 'Ideias.yml');
+                        console.log('Reading template file at', templatePath);
+
+                        let templateText = '';
+                        if (fs.existsSync(templatePath)) {
+                          const raw = fs.readFileSync(templatePath, 'utf8');
+                          try {
+                            const parsed = yaml.load(raw);
+                            // If parsed has body array, extract first markdown block (or concatenate markdown blocks)
+                            if (parsed && parsed.body && Array.isArray(parsed.body)) {
+                              const mdParts = parsed.body.filter(b => b.type === 'markdown').map(b => b.attributes && b.attributes.value ? b.attributes.value : '');
+                              templateText = mdParts.join('\n\n');
+                              // Append a simple field list to guide the user
+                              templateText += '\n\n- Servidor afetado:\n- Qual o propósito da ideia:\n- Descrição da ideia:\n- Aplicação:\n- Referências:\n\n---\n\n';
+                            } else {
+                              templateText = raw;
+                            }
+                          } catch (e) {
+                            console.log('YAML parse failed, using raw file content. Error:', e.message);
+                            templateText = raw;
+                          }
+                        } else {
+                          console.log('Template file not found, using fallback header');
+                          templateText = `**Template aplicado:** Ideias\n\nAnote suas ideias aqui...\n\n- Servidor afetado:\n- Qual o propósito da ideia:\n- Descrição da ideia:\n- Aplicação:\n- Referências:\n\n---\n\n`;
+                        }
+
+                        // Merge template text with existing body (prefix)
+                        const existingBody = discussion.body || '';
+                        const newBody = templateText + existingBody;
+
+                        console.log('Updating discussion with new body (prefix length):', templateText.length);
+                        await github.rest.discussions.update({
                           owner: context.repo.owner,
                           repo: context.repo.repo,
-                          discussion_number: discussionNumber
+                          discussion_number: discussionNumber,
+                          body: newBody
                         });
-                        categoryName = d.data.category && d.data.category.name ? d.data.category.name : null;
+
+                        console.log('Discussion updated successfully');
+                      } catch (err) {
+                        console.log('Error in apply-ideas-template action:', err.message || err);
+                        throw err;
                       }
-
-                      if (!categoryName) {
-                        console.log('No category found for discussion, skipping.');
-                        return;
-                      }
-
-                      if (categoryName.toLowerCase() !== 'ideias') {
-                        console.log(`Discussion category is '${categoryName}', not 'Ideias' — skipping.`);
-                        return;
-                      }
-
-                      // Template header to inject (matches fields in .github/DISCUSSION_TEMPLATE/Ideias.yml)
-                      const templateHeader = `**Template aplicado:** Ideias\n\nAnote suas ideias aqui (bem formatas ou não), aqui podemos discutir com mais clareza e depois levar para um desenvolvimento.\n\n- Servidor afetado:\n- Qual o propósito da ideia:\n- Descrição da ideia:\n- Aplicação:\n- Referências:\n\n---\n\n`;
-
-                      // Merge template header with existing body (don't overwrite user's content)
-                      const newBody = templateHeader + (discussion.body || '');
-
-                      await github.rest.discussions.update({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        discussion_number: discussionNumber,
-                        body: newBody
-                      });
