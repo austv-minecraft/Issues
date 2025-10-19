@@ -1,0 +1,58 @@
+name: Apply 'Ideias' template on discussion created
+
+on:
+    discussion:
+        types: [created]
+
+permissions:
+    discussions: write
+    contents: read
+
+jobs:
+    apply-ideias-template:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Inject Ideias template when category is 'Ideias'
+              uses: actions/github-script@v6
+              with:
+                  script: |
+                      const discussion = context.payload.discussion;
+                      const discussionNumber = discussion.number;
+
+                      // Try to get category name from payload, fallback to API if not present
+                      let categoryName = discussion.category && discussion.category.name ? discussion.category.name : null;
+                      if (!categoryName) {
+                        const d = await github.rest.discussions.get({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          discussion_number: discussionNumber
+                        });
+                        categoryName = d.data.category && d.data.category.name ? d.data.category.name : null;
+                      }
+
+                      if (!categoryName) {
+                        console.log('No category found for discussion, skipping.');
+                        return;
+                      }
+
+                      if (categoryName.toLowerCase() !== 'ideias') {
+                        console.log(`Discussion category is '${categoryName}', not 'Ideias' — skipping.`);
+                        return;
+                      }
+
+                      // Template header to inject (matches fields in .github/DISCUSSION_TEMPLATE/Ideias.yml)
+                      const templateHeader = `**Template aplicado:** Ideias\n\nAnote suas ideias aqui (bem formatas ou não), aqui podemos discutir com mais clareza e depois levar para um desenvolvimento.\n\n- Servidor afetado:\n- Qual o propósito da ideia:\n- Descrição da ideia:\n- Aplicação:\n- Referências:\n\n---\n\n`;
+
+                      // Merge template header with existing body (don't overwrite user's content)
+                      const newBody = templateHeader + (discussion.body || '');
+
+                      await github.rest.discussions.update({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        discussion_number: discussionNumber,
+                        body: newBody
+                      });
