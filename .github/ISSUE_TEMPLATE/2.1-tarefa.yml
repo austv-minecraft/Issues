@@ -1,0 +1,29 @@
+name: Tarefa
+description: Lembrar de fazer algo
+# labels: ["tarefa", "→⚪"]
+type: 'Tarefa'
+assignees: ["leogianfagna"]
+body:
+  - type: textarea
+    attributes:
+      label: Descrição da tarefa
+      description: O que precisa ser feito? Você pode enviar arquivos.
+    validations:
+      required: true
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Gravidade
+      description: |
+        Defina uma gravidade para esse bug caso ele de fato esteja afetando
+        algo muito crítico no servidor ou causando um certo incômodo. Caso contrário,
+        não selecione nenhuma opção
+      options:
+        - Não especificado
+        - Baixa
+        - Média
+        - Alta
+        - Urgência total
+      default: 0
+    validations:
+      required: false

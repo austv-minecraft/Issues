@@ -1,0 +1,38 @@
+name: Padrão de mensagem
+title: Padrão de mensagem equivocado
+description: Existe uma mensagem fora do padrão.
+labels: ['quick fix']
+type: 'Bug'
+assignees: leogianfagna
+body:
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor referido
+      description: Este bug está em qual servidor?
+      options:
+        - Não especificado (qualquer)
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - Discord
+        - Sites ou externos
+        - Redes sociais
+        - Um novo servidor
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Print da mensagem
+      description: Envie um print da mensagem no chat que está fora do padrão.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reprodução
+      description: Descreva o passo a passo de como chegar até essa mensagem.
+    validations:
+      required: true

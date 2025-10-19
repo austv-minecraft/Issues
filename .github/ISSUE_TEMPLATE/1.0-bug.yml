@@ -1,0 +1,64 @@
+name: Bug
+description: Reportar um bug ou comportamento equivocado
+# labels: ['bug: confirmado', '→⚪']
+type: 'Bug'
+assignees: leogianfagna
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Confira em responder todos os campos corretamente.
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor referido
+      description: Este bug está em qual servidor?
+      options:
+        - Não especificado (qualquer)
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - Discord
+        - Sites ou externos
+        - Redes sociais
+        - Um novo servidor
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Descrição do bug
+      description: Descreva o que ocorreu de forma equivocada.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reprodução
+      description: |
+        Descreva detalhamente como reproduzir o bug. Se alguém que denunciou,
+        pergunte-o ou peça prints do bug e envie aqui.
+    validations:
+      required: true
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Gravidade
+      description: |
+        Defina uma gravidade para esse bug caso ele de fato esteja afetando
+        algo muito crítico no servidor ou causando um certo incômodo. Caso contrário,
+        não selecione nenhuma opção
+      options:
+        - Não especificado
+        - Baixa
+        - Média
+        - Alta
+        - Urgência total
+      default: 0
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        **Atenção:** Selecione as tags referentes a qual servidor. Caso necessário, altere o responsável por corrigir o bug. Se o bug ainda não foi confirmado, altere o tag para bug não confirmado.

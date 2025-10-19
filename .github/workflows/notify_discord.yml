@@ -1,0 +1,21 @@
+name: Notificar Discord
+
+on:
+  issues:
+    types: [opened, closed]
+  issue_comment:
+    types: [created]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v3
+
+      - name: Executar script de notificação
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          chmod +x ./notify_discord.sh
+          ./notify_discord.sh

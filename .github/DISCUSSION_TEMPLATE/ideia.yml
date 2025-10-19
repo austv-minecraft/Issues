@@ -1,0 +1,54 @@
+labels: ['ideia: sugerida', 'relev: não medida']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Anote suas ideias aqui (bem formatas ou não), aqui podemos discutir com mais clareza e depois levar para um desenvolvimento.
+        Discutiremos nessa aba de discussões até que entrar no cronograma para ser implementada.
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor afetado
+      description: Essa ideia é direcionada para qual área?
+      options:
+        - Todos
+        - Discord
+        - Sites ou externos
+        - Redes sociais
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - Um novo servidor
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: proposito
+    attributes:
+      label: Qual o propósito da ideia?
+      description: |
+        Diga o porquê dessa ideia. Ela inclusive pode ser uma
+        sugestão que você viu no Discord e está implementando com ideias.
+      placeholder: Ex. Ela vai melhorar as reclamações recentes
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Descrição da ideia
+      description: Manda a bala aqui com tudo que puder!
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Aplicação
+      description: Tem ideia de como aplicar ela ao servidor?
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Referências
+      description: Você tem alguma referência dessa ideia? Mande vídeos, prints, o que puder!
+    validations:
+      required: false

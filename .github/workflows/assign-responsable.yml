@@ -1,0 +1,32 @@
+name: Assign issues responsable
+on:
+  issues:
+    types:
+      - reopened
+      - opened
+jobs:
+  assign_issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Normalize issue body and determine assignee
+        id: determine_assignee
+        run: |
+          # Normaliza o texto para remover quebras de linha e espaços desnecessários
+          ISSUE_BODY=$(echo "${{ github.event.issue.body }}" | tr -d '\r' | tr '\n' ' ' | sed 's/  */ /g')
+          
+          # Define o autor com base no texto normalizado
+          if echo "$ISSUE_BODY" | grep -qi "Servidor referido Skyten"; then
+            echo "assignee=Micosedeunha" >> $GITHUB_ENV
+          else
+            echo "assignee=" >> $GITHUB_ENV
+          fi
+      - name: Assign issue if determined
+        if: env.assignee != ''
+        run: gh issue edit "$NUMBER" --add-assignee "$ASSIGNEE"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          ASSIGNEE: ${{ env.assignee }}

@@ -1,0 +1,77 @@
+name: Bug - Objetivo
+title: Objetivo com problema
+# labels: ['bug: confirmado', '→⚪']
+type: 'Bug'
+description: "Reporte um objetivo que não está funcionando corretamente."
+assignees: leogianfagna
+body:
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor referido
+      description: "Qual servidor o objetivo se encontra?"
+      options:
+        - Henesys
+        - Vanillew
+        - Skyten
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: "O que acontece?"
+      description: "Defina os detalhes do problema."
+      placeholder: "Não está contabilizando X coisa fazendo de Y forma..."
+    validations:
+      required: true
+  - type: textarea
+    id: prints
+    attributes:
+      label: "Prints ou vídeos"
+      description: "Insira qualquer tipo de vídeo ou print que tiver."
+    validations:
+      required: false
+  - type: input
+    id: questinfo1
+    attributes:
+      label: "Nome do objetivo"
+      placeholder: "Senhor das moscas"
+    validations:
+      required: true
+  - type: input
+    id: questinfo2
+    attributes:
+      label: "Categoria/semana que pertence"
+      placeholder: "Colonial/Semana 2/Tutorial..."
+    validations:
+      required: true
+  - type: input
+    id: questinfo3
+    attributes:
+      label: "Posição na categoria"
+      placeholder: "4"
+    validations:
+      required: true
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Gravidade
+      description: |
+        Defina uma gravidade para esse bug caso ele de fato esteja afetando
+        algo muito crítico no servidor ou causando um certo incômodo. Caso contrário,
+        não selecione nenhuma opção
+      options:
+        - Não especificado
+        - Baixa
+        - Média
+        - Alta
+        - Urgência total
+      default: 0
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        Caso o objetivo seja no servidor de **Skyblock**, não esqueça de alterar o usuário
+        responsável. Sempre envie todas as informações possíveis necessárias.

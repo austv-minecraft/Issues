@@ -1,0 +1,58 @@
+name: Label issues
+on:
+  issues:
+    types:
+      - reopened
+      - opened
+jobs:
+  label_issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Normalize issue body and determine labels
+        id: determine_labels
+        run: |
+          # Normaliza o texto para remover quebras de linha e espaços desnecessários
+          ISSUE_BODY=$(echo "${{ github.event.issue.body }}" | tr -d '\r' | tr '\n' ' ' | sed 's/  */ /g')
+          
+          # Inicializa a variável para armazenar labels
+          LABELS=""
+
+          # Prioridade
+          if echo "$ISSUE_BODY" | grep -qi "Gravidade Baixa"; then
+            LABELS="$LABELS,→🟢"
+          elif echo "$ISSUE_BODY" | grep -qi "Gravidade Média"; then
+            LABELS="$LABELS,→🟡"
+          elif echo "$ISSUE_BODY" | grep -qi "Gravidade Alta"; then
+            LABELS="$LABELS,→🟠"
+          elif echo "$ISSUE_BODY" | grep -qi "Gravidade Urgência total"; then
+            LABELS="$LABELS,→🔴"
+          fi
+          
+          # Servidores
+          if echo "$ISSUE_BODY" | grep -qi "Servidor referido Lobby"; then
+            LABELS="$LABELS,sv: lobby"
+          elif echo "$ISSUE_BODY" | grep -qi "Servidor referido Vanillew"; then
+            LABELS="$LABELS,sv: vanillew"
+          elif echo "$ISSUE_BODY" | grep -qi "Servidor referido Ausevento"; then
+            LABELS="$LABELS,sv: ausevento"
+          elif echo "$ISSUE_BODY" | grep -qi "Servidor referido Skyten"; then
+            LABELS="$LABELS,sv: skyten"
+          elif echo "$ISSUE_BODY" | grep -qi "Servidor referido Henesys"; then
+            LABELS="$LABELS,sv: henesys"
+          fi
+
+          # Remove vírgula inicial, se existir
+          LABELS=$(echo "$LABELS" | sed 's/^,//')
+          
+          # Define as labels no ambiente do workflow
+          echo "labels=$LABELS" >> $GITHUB_ENV
+      - name: Add labels if determined
+        if: env.labels != ''
+        run: gh issue edit "$NUMBER" --add-label "$LABELS"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          LABELS: ${{ env.labels }}
