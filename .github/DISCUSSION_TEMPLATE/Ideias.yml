@@ -20,6 +20,7 @@ body:
         - Skyten
         - Lobby
         - Ausevento
+        - AusDungeon
         - Um novo servidor
       default: 0
     validations:

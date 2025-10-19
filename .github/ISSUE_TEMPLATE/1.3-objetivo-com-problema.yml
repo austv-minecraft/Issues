@@ -3,7 +3,7 @@ title: Objetivo com problema
 # labels: ['bug: confirmado', '→⚪']
 type: 'Bug'
 description: "Reporte um objetivo que não está funcionando corretamente."
-assignees: leogianfagna
+assignees: ["ZzPowerTechzZ"]
 body:
   - type: dropdown
     id: servidor

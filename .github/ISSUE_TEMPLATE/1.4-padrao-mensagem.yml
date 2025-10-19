@@ -3,7 +3,7 @@ title: Padrão de mensagem equivocado
 description: Existe uma mensagem fora do padrão.
 labels: ['quick fix']
 type: 'Bug'
-assignees: leogianfagna
+assignees: ["ZzPowerTechzZ"]
 body:
   - type: dropdown
     id: servidor
@@ -17,6 +17,7 @@ body:
         - Skyten
         - Lobby
         - Ausevento
+        - AusDungeon
         - Discord
         - Sites ou externos
         - Redes sociais

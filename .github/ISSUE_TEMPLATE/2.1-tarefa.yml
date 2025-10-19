@@ -2,7 +2,7 @@ name: Tarefa
 description: Lembrar de fazer algo
 # labels: ["tarefa", "→⚪"]
 type: 'Tarefa'
-assignees: ["leogianfagna"]
+assignees: ["ZzPowerTechzZ"]
 body:
   - type: textarea
     attributes:
@@ -19,11 +19,11 @@ body:
         algo muito crítico no servidor ou causando um certo incômodo. Caso contrário,
         não selecione nenhuma opção
       options:
-        - Não especificado
-        - Baixa
-        - Média
-        - Alta
-        - Urgência total
+        - ⚪ Não especificado
+        - 🟢 Baixa
+        - 🟡 Média
+        - 🟠 Alta
+        - 🔴 Urgência total
       default: 0
     validations:
       required: false

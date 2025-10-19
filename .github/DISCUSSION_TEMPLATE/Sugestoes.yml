@@ -1,0 +1,79 @@
+labels: ["Brainstorm", "relev: não medida"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use este template para enviar sugestões claras e acionáveis. Descreva o problema/necessidade, o que propõe, por que é importante e, se possível, como implementar.
+  - type: input
+    id: titulo
+    attributes:
+      label: Título curto
+      description: Um título objetivo para a sugestão (uma linha).
+      placeholder: Ex. Melhorar mensagens automáticas de erro
+    validations:
+      required: true
+  - type: input
+    id: resumo
+    attributes:
+      label: Resumo breve
+      description: Um resumo de 1-2 linhas explicando a sugestão.
+      placeholder: Ex. Ajustar textos e links nas mensagens de erro para ajudar o usuário
+    validations:
+      required: true
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição detalhada
+      description: Explique a sugestão com o máximo de detalhes (o que, quando, para quem e por quê).
+    validations:
+      required: true
+  - type: dropdown
+    id: impacto
+    attributes:
+      label: Impacto esperado
+      description: Em qual área/ou público essa sugestão terá maior impacto?
+      options:
+        - Baixo
+        - Médio
+        - Alto
+      default: 1
+    validations:
+      required: true
+  - type: dropdown
+    id: complexidade
+    attributes:
+      label: Esforço / Complexidade estimada
+      description: Quanto esforço você acha que essa sugestão demanda?
+      options:
+        - Baixo
+        - Médio
+        - Alto
+      default: 1
+    validations:
+      required: true
+  - type: textarea
+    id: beneficios
+    attributes:
+      label: Benefícios esperados
+      description: Quais ganhos (usuário/equipe) essa sugestão traria?
+    validations:
+      required: false
+  - type: textarea
+    id: referencias
+    attributes:
+      label: Referências / Exemplos
+      description: Links, prints, vídeos ou referências externas que ajudem a entender a sugestão.
+    validations:
+      required: false
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Prioridade sugerida
+      description: Como priorizar isso em relação a outras ideias?
+      options:
+        - Baixa
+        - Normal
+        - Alta
+      default: 1
+    validations:
+      required: false

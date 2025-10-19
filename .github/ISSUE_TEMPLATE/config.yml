@@ -3,6 +3,3 @@ contact_links:
   - name: "Ideia"
     about: "Tive uma ideia e vamos registrar"
     url: "https://github.com/austv-minecraft/AusTv/discussions/new?category=ideia"
-  - name: "Minha opinião"
-    about: "Tem uma coisa que acho que não está muito bem e acho que precisamos melhorar"
-    url: "https://github.com/austv-minecraft/AusTv/discussions/new?category=opini%C3%B5es"
