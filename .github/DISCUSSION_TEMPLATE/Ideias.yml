@@ -4,7 +4,7 @@ body:
       value: |
         💬 **Compartilhe suas ideias com a equipe AusTV!**
         Aqui você pode deixar sugestões, melhorias e conceitos (bem formatados ou não).
-        Discutiremos tudo por aqui até que a ideia entre no cronograma de desenvolvimento. 🛠️
+        Discutiremos tudo por aqui até que a ideia entre no cronograma de desenvolvimento.  aaaaaaa🛠️
   - type: dropdown
     id: servidor
     attributes:
