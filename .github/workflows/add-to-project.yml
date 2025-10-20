@@ -36,6 +36,10 @@ jobs:
             # Configure aqui o número do Project V2 (o número visível na URL do project)
             # Exemplo: para https://github.com/orgs/austv-minecraft/projects/21 use 21
             PROJECT_NUMBER: 21
+            # Opcional: id interno do Classic Project (use para pular a busca automática)
+            PROJECT_ID: ${{ secrets.PROJECT_ID }}
+            # Opcional: URL HTML do projeto (ex: https://github.com/orgs/austv-minecraft/projects/21)
+            PROJECT_HTML_URL: ""
             # Escopo do projeto: 'repository' ou 'organization'
             PROJECT_SCOPE: organization
             # Opcional: configure um Personal Access Token com permissões de Project e adicione como secret PROJECT_TOKEN
@@ -50,20 +54,35 @@ jobs:
                         const owner = context.repo.owner;
                         const repo = context.repo.repo;
 
-                        // Determine content node id from event payload
+                        // Support manual simulation via workflow_dispatch inputs: context.payload.inputs
+                        const inputs = (context.payload && context.payload.inputs) || {};
+                        // Determine content node id from event payload or simulation inputs
                         let contentNodeId = null;
-                        if (context.payload.issue) {
+                        if (inputs && inputs.simulate_type && inputs.simulate_type.toLowerCase() === 'issue') {
+                          // If simulating an issue, use the provided simulate_node_id if available
+                          contentNodeId = inputs.simulate_node_id || (context.payload.issue && context.payload.issue.node_id) || null;
+                          console.log('Simulating issue event, node_id=', contentNodeId);
+                        } else if (inputs && inputs.simulate_type && inputs.simulate_type.toLowerCase() === 'discussion') {
+                          contentNodeId = inputs.simulate_node_id || (context.payload.discussion && context.payload.discussion.node_id) || null;
+                          console.log('Simulating discussion event, node_id=', contentNodeId);
+                        } else if (context.payload.issue) {
                           contentNodeId = context.payload.issue.node_id;
                           console.log('Event: issue opened, node_id=', contentNodeId);
                         } else if (context.payload.discussion) {
                           contentNodeId = context.payload.discussion.node_id;
                           console.log('Event: discussion created, node_id=', contentNodeId);
                         } else {
-                          console.log('No issue or discussion found in payload; exiting.');
+                          console.log('No issue or discussion found in payload and no simulation input provided; exiting.');
                           return;
                         }
 
                         if (!contentNodeId) throw new Error('Content node id not found in payload');
+
+                        // Determine issue numeric id and discussion URL (supports simulation inputs)
+                        const isSimulatedIssue = inputs && inputs.simulate_type && inputs.simulate_type.toLowerCase() === 'issue';
+                        const isSimulatedDiscussion = inputs && inputs.simulate_type && inputs.simulate_type.toLowerCase() === 'discussion';
+                        const issueNumericId = (isSimulatedIssue && inputs.simulate_issue_id) ? parseInt(inputs.simulate_issue_id, 10) : (context.payload.issue && context.payload.issue.id);
+                        const discussionUrl = (isSimulatedDiscussion && inputs.simulate_discussion_url) ? inputs.simulate_discussion_url : (context.payload.discussion && context.payload.discussion.html_url);
 
                         const projectNumber = parseInt(process.env.PROJECT_NUMBER, 10);
                         if (!projectNumber || isNaN(projectNumber)) {
@@ -73,29 +92,60 @@ jobs:
                         // First, try Projects Classic (REST API) because many orgs still use classic projects.
                         console.log('Attempting Projects Classic (REST) lookup first (project number', projectNumber, ')');
                         let classicProject = null;
+                        // If caller provided a PROJECT_ID env var, use it directly (skip discovery)
+                        if (process.env.PROJECT_ID) {
+                          console.log('PROJECT_ID provided; skipping discovery and using PROJECT_ID=', process.env.PROJECT_ID);
+                          classicProject = { id: parseInt(process.env.PROJECT_ID, 10), name: null, html_url: process.env.PROJECT_HTML_URL || null };
+                        }
                         try {
                           let projectsList;
-                          if (process.env.PROJECT_TOKEN) {
-                            console.log('Using PROJECT_TOKEN to list organization projects via REST');
-                            projectsList = await github.request('GET /orgs/{org}/projects', {
-                              org: owner,
-                              per_page: 100,
-                              headers: { authorization: `token ${process.env.PROJECT_TOKEN}` }
-                            });
+                          const scope = (process.env.PROJECT_SCOPE || 'repository').toLowerCase();
+                          if (scope === 'repository') {
+                            console.log('Looking for classic projects in repository', owner + '/' + repo);
+                            if (process.env.PROJECT_TOKEN) {
+                              projectsList = await github.request('GET /repos/{owner}/{repo}/projects', {
+                                owner,
+                                repo,
+                                per_page: 100,
+                                headers: { authorization: `token ${process.env.PROJECT_TOKEN}`, accept: 'application/vnd.github.inertia-preview+json' }
+                              });
+                            } else {
+                              projectsList = await github.request('GET /repos/{owner}/{repo}/projects', {
+                                owner,
+                                repo,
+                                per_page: 100,
+                                headers: { accept: 'application/vnd.github.inertia-preview+json' }
+                              });
+                            }
                           } else {
-                            console.log('Using GITHUB_TOKEN to list organization projects (may be limited)');
-                            projectsList = await github.rest.projects.listForOrg({ org: owner, per_page: 100 });
+                            console.log('Looking for classic projects in organization', owner);
+                            if (process.env.PROJECT_TOKEN) {
+                              projectsList = await github.request('GET /orgs/{org}/projects', {
+                                org: owner,
+                                per_page: 100,
+                                headers: { authorization: `token ${process.env.PROJECT_TOKEN}`, accept: 'application/vnd.github.inertia-preview+json' }
+                              });
+                            } else {
+                              projectsList = await github.request('GET /orgs/{org}/projects', {
+                                org: owner,
+                                per_page: 100,
+                                headers: { accept: 'application/vnd.github.inertia-preview+json' }
+                              });
+                            }
                           }
-                          const found = (projectsList.data || []).find(p => {
+                          const listArr = (projectsList && projectsList.data) || [];
+                          console.log('Classic projects list count:', listArr.length);
+                          const found = listArr.find(p => {
                             try {
                               const urlParts = (p.html_url || '').split('/');
                               const num = parseInt(urlParts[urlParts.length - 1], 10);
+                              console.log('Project entry:', p.name, 'visible number:', num);
                               return num === projectNumber;
                             } catch (e) { return false; }
                           });
                           classicProject = found || null;
                         } catch (errList) {
-                          console.log('Error listing organization projects (classic):', errList.message || errList);
+                          console.log('Error listing classic projects:', errList && (errList.message || errList));
                         }
 
                         if (classicProject && classicProject.id) {
@@ -105,10 +155,13 @@ jobs:
                           if (process.env.PROJECT_TOKEN) {
                             colsRes = await github.request('GET /projects/{project_id}/columns', {
                               project_id: classicProject.id,
-                              headers: { authorization: `token ${process.env.PROJECT_TOKEN}` }
+                              headers: { authorization: `token ${process.env.PROJECT_TOKEN}`, accept: 'application/vnd.github.inertia-preview+json' }
                             });
                           } else {
-                            colsRes = await github.rest.projects.listColumns({ project_id: classicProject.id });
+                            colsRes = await github.request('GET /projects/{project_id}/columns', {
+                              project_id: classicProject.id,
+                              headers: { accept: 'application/vnd.github.inertia-preview+json' }
+                            });
                           }
                           const cols = colsRes.data || [];
                           if (!cols.length) throw new Error('No columns found in classic project ' + classicProject.id);
