@@ -109,20 +109,11 @@ jobs:
                   }
                   console.log(`Trying fallback lookup: owner=${owner}, number=${number}`);
                   const fb = await gql(
-<<<<<<< HEAD
-                    'query($owner:String!,$number:Int!){\n                      organization(login:$owner){ projectV2(number:$number){ id title } }\n                      user(login:$owner){ projectV2(number:$number){ id title } }\n                    }',
-=======
                     'query($owner:String!,$number:Int!){\n                      organization(login:$owner){ project(number:$number){ id name } projectV2(number:$number){ id title number } projectsV2(first:100){ nodes{ id title number } } }\n                      user(login:$owner){ projectV2(number:$number){ id title number } }\n                    }',
->>>>>>> 94a4e9f (chore: remove leaked token from workflow)
                     { owner, number }
                   );
                   const orgProj = fb?.data?.organization?.projectV2;
                   const userProj = fb?.data?.user?.projectV2;
-<<<<<<< HEAD
-                  const found = orgProj || userProj;
-                  if (!found) {
-                    throw new Error(`Could not resolve ProjectV2 by owner+number. Check if project #${number} exists under ${owner}, is Project v2 (not Classic), and PAT has access (org membership + SSO + added to project).`);
-=======
                   const orgClassic = fb?.data?.organization?.project;
                   let found = orgProj || userProj;
                   if (!found) {
@@ -138,7 +129,6 @@ jobs:
                       throw new Error(`Project #${number} under ${owner} appears to be a Classic project (GraphQL type Project). This workflow targets Project v2 only. Migrate to Projects (v2) or create a new Project v2 and update PROJECT_NUMBER/ID.`);
                     }
                     throw new Error(`Could not resolve ProjectV2 by owner+number. Ensure project #${number} exists under ${owner}, PAT user can see the org and the project (org membership + SSO), and the PAT user is added to the Project v2 with Write. Also confirm the repo owner matches the project owner or set PROJECT_OWNER explicitly.`);
->>>>>>> 94a4e9f (chore: remove leaked token from workflow)
                   }
                   projNode = { __typename: 'ProjectV2', id: found.id, title: found.title };
                   if (projectId !== found.id) {
