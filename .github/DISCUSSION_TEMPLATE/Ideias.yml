@@ -1,4 +1,4 @@
-
+labels: ["relev: não medida"]
 body:
   - type: markdown
     attributes:

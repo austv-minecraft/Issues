@@ -1,0 +1,47 @@
+labels: ['duvida']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tem alguma dúvida? Faça sua pergunta de forma clara, anexando contexto e passos para reproduzir quando aplicável. A comunidade e os mantenedores irão ajudar.
+  - type: input
+    id: resumo
+    attributes:
+      label: Resumo da dúvida
+      description: Uma linha explicando rapidamente sua pergunta.
+      placeholder: Ex. Como configurar o bot de moderação?
+    validations:
+      required: true
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto / Ambiente
+      description: Informe versão, local (servidor/arquivo), ações realizadas antes do problema.
+    validations:
+      required: false
+  - type: textarea
+    id: passos
+    attributes:
+      label: Passos para reproduzir (se aplicável)
+      description: Liste passos numerados para que outra pessoa consiga reproduzir sua dúvida/erro.
+    validations:
+      required: false
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Evidências / Logs / Prints
+      description: Anexe logs, prints ou links que ajudem a entender a situação.
+    validations:
+      required: false
+  - type: dropdown
+    id: urgencia
+    attributes:
+      label: Urgência
+      description: Indique o nível de urgência desta dúvida.
+      options:
+        - Baixa
+        - Média
+        - Alta
+      default: 1
+    validations:
+      required: false

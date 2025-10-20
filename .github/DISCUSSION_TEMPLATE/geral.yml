@@ -1,0 +1,29 @@
+labels: ["relev: não medida"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Espaço para conversas gerais, anúncios e bate-papo amistoso.
+        Use este espaço para compartilhar novidades, combinar encontros e discutir assuntos relacionados ao projeto.
+  - type: input
+    id: titulo
+    attributes:
+      label: Título
+      description: Um título curto para sua conversa ou anúncio.
+      placeholder: Ex. Evento de fim de semana
+    validations:
+      required: true
+  - type: textarea
+    id: conteudo
+    attributes:
+      label: Conteúdo
+      description: Escreva sua mensagem ou anúncio.
+    validations:
+      required: true
+  - type: textarea
+    id: anexos
+    attributes:
+      label: Links / Anexos (opcional)
+      description: Adicione links, imagens ou outros recursos úteis.
+    validations:
+      required: false
