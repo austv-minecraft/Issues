@@ -1,6 +1,24 @@
-name: Adicona a issue no project
+name: Adiciona a issue no project
 
 on:
+    workflow_dispatch:
+        inputs:
+            simulate_type:
+                description: 'Set to "issue" or "discussion" to simulate an event (optional)'
+                required: false
+                default: ""
+            simulate_node_id:
+                description: "Optional: node_id to simulate (useful for testing)"
+                required: false
+                default: ""
+            simulate_issue_id:
+                description: "Optional: numeric issue id (for classic projects createCard content_id)"
+                required: false
+                default: ""
+            simulate_discussion_url:
+                description: "Optional: discussion html_url to use when simulating a discussion"
+                required: false
+                default: ""
     issues:
         types: [opened]
     discussion:
