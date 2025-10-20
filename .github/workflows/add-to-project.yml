@@ -40,43 +40,43 @@ jobs:
             }
 
             // 2) Validar disponibilidade do PAT
-            const tokenPresent = !!process.env.PROJECT_TOKEN;
-            console.log('PROJECT_TOKEN present?', tokenPresent);
-            if (!tokenPresent) {
+            const token = process.env.PROJECT_TOKEN;
+            if (!token) {
               core.setFailed('PROJECT_TOKEN secret is not set. Provide a PAT with project/repo/read:org.');
               return;
             }
+            console.log('PROJECT_TOKEN present: true');
+            console.log('Token length:', token.length);
 
-            // 2.1) Diagnóstico: identidade do PAT e escopos OAuth
+            // 2.1) Diagnóstico: identidade do PAT via GraphQL
             try {
-              const who = await github.request('GET /user', {
-                headers: { authorization: `bearer ${process.env.PROJECT_TOKEN}` }
+              const viewerRes = await github.request('POST /graphql', {
+                headers: { authorization: `token ${token}` },
+                data: JSON.stringify({ query: 'query { viewer { login } }' })
               });
-              const viewerLogin = who?.data?.login;
-              const scopes = who?.headers?.['x-oauth-scopes'] || who?.headers?.['X-OAuth-Scopes'];
-              console.log(`PAT viewer.login: ${viewerLogin || 'unknown'}`);
-              console.log(`PAT OAuth scopes: ${scopes || 'unknown'}`);
+              console.log('PAT viewer.login:', viewerRes?.data?.data?.viewer?.login || 'unknown');
             } catch (e) {
-              console.log('Warning: could not query /user with PAT for diagnostics:', e.message || e);
+              console.log('Warning: viewer query failed:', e.message);
             }
 
-            // 3) Preparar GraphQL usando o PAT
-            async function gql(query, variables) {
-              const res = await github.request({
-                method: 'POST',
-                url: 'https://api.github.com/graphql',
-                headers: {
-                  authorization: `bearer ${process.env.PROJECT_TOKEN}`,
-                  'content-type': 'application/json'
-                },
-                data: { query, variables }
-              });
-              const data = res.data;
-              if (data.errors && data.errors.length) {
-                console.log('GraphQL errors:', JSON.stringify(data.errors));
-                throw new Error(data.errors[0].message || 'GraphQL error');
+            // 3) Preparar GraphQL usando o PAT (esquema 'token' em vez de 'bearer')
+            async function gql(query, variables = {}) {
+              try {
+                const response = await github.request('POST /graphql', {
+                  headers: { authorization: `token ${token}` },
+                  data: JSON.stringify({ query, variables })
+                });
+                
+                if (response.data.errors && response.data.errors.length) {
+                  console.log('GraphQL errors:', JSON.stringify(response.data.errors, null, 2));
+                  throw new Error(response.data.errors[0].message || 'GraphQL error');
+                }
+                
+                return response.data;
+              } catch (error) {
+                console.log('GraphQL request failed:', error.message);
+                throw error;
               }
-              return data;
             }
 
             // 4) Resolver ProjectV2 por ID (fornecido)
@@ -108,42 +108,36 @@ jobs:
                     throw new Error('Fallback requires valid owner and PROJECT_NUMBER.');
                   }
                   console.log(`Trying fallback lookup: owner=${owner}, number=${number}`);
-                  const fb = await gql(
-                    `query($owner:String!,$number:Int!){
-                      organization(login:$owner){
-                        project(number:$number){ id name }
-                        projectV2(number:$number){ id title number }
-                        projectsV2(first:100){ nodes{ id title number } }
+                  
+                  // Tentar buscar via lista de projetos da organização
+                  const listQuery = `
+                    query($owner: String!) {
+                      organization(login: $owner) {
+                        projectsV2(first: 100) {
+                          nodes {
+                            id
+                            title
+                            number
+                          }
+                        }
                       }
-                      user(login:$owner){
-                        projectV2(number:$number){ id title number }
-                      }
-                    }`,
-                    { owner, number }
-                  );
-                  const orgProj = fb?.data?.organization?.projectV2;
-                  const userProj = fb?.data?.user?.projectV2;
-                  const orgClassic = fb?.data?.organization?.project;
-                  let found = orgProj || userProj;
-                  if (!found) {
-                    const orgList = fb?.data?.organization?.projectsV2?.nodes || [];
-                    const byNumber = orgList.find(p => p?.number === number);
-                    if (byNumber) {
-                      console.log(`Discovered via org projects list: ${byNumber.title} (#${byNumber.number}) -> ${byNumber.id}`);
-                      found = byNumber;
                     }
-                  }
+                  `;
+                  
+                  const listRes = await gql(listQuery, { owner });
+                  const orgProjects = listRes?.data?.organization?.projectsV2?.nodes || [];
+                  console.log(`Found ${orgProjects.length} projects in org`);
+                  
+                  const found = orgProjects.find(p => p.number === number);
+                  
                   if (!found) {
-                    if (orgClassic?.id) {
-                      throw new Error(`Project #${number} under ${owner} appears to be a Classic project (GraphQL type Project). This workflow targets Project v2 only. Migrate to Projects (v2) or create a new Project v2 and update PROJECT_NUMBER/ID.`);
-                    }
-                    throw new Error(`Could not resolve ProjectV2 by owner+number. Ensure project #${number} exists under ${owner}, PAT user can see the org and the project (org membership + SSO), and the PAT user is added to the Project v2 with Write. Also confirm the repo owner matches the project owner or set PROJECT_OWNER explicitly.`);
+                    const projectTitles = orgProjects.map(p => `#${p.number}: ${p.title}`).join(', ');
+                    throw new Error(`Could not find Project v2 #${number} under ${owner}. Available projects: ${projectTitles || 'none visible to PAT'}. Ensure: (1) PAT user is org member, (2) SSO authorized if applicable, (3) user added to Project v2 with Write permission.`);
                   }
+                  
+                  console.log(`Discovered via org projects list: ${found.title} (#${found.number}) -> ${found.id}`);
                   projNode = { __typename: 'ProjectV2', id: found.id, title: found.title };
-                  if (projectId !== found.id) {
-                    console.log(`Notice: discovered project id differs from provided PROJECT_ID. Using discovered id: ${found.id}`);
-                    projectId = found.id;
-                  }
+                  projectId = found.id;
                 }
                 console.log('Target ProjectV2:', projNode.title, `(#${process.env.PROJECT_NUMBER})`, projectId);
 
