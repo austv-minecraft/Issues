@@ -1,4 +1,4 @@
-name: Add issue/discussion to Project v2
+name: Adicona a issue no project
 
 on:
     issues:
@@ -20,6 +20,8 @@ jobs:
             PROJECT_NUMBER: 21
             # Escopo do projeto: 'repository' ou 'organization'
             PROJECT_SCOPE: organization
+            # Opcional: configure um Personal Access Token com permissões de Project e adicione como secret PROJECT_TOKEN
+            PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
 
         steps:
             - name: Adiciona ao projeto austv
@@ -50,102 +52,18 @@ jobs:
                           throw new Error('PROJECT_NUMBER env var not set to a valid number. Edit workflow to set PROJECT_NUMBER to your Project v2 number.');
                         }
 
-                        // Depending on scope, query repository or organization for the ProjectV2
-                        let project = null;
-                        if ((process.env.PROJECT_SCOPE || 'repository').toLowerCase() === 'organization') {
-                          console.log('Looking for organization projectV2 number', projectNumber, 'in org', owner);
-                          const queryOrg = `query($org:String!, $number:Int!){ organization(login:$org){ projectV2(number:$number){ id title } } }`;
-                          try {
-                            const qres = await github.graphql(queryOrg, { org: owner, number: projectNumber });
-                            project = qres && qres.organization && qres.organization.projectV2;
-                          } catch (errQ) {
-                            console.log('GraphQL query for organization projectV2 failed, continuing to fallback. Error:', errQ.message || errQ);
-                            project = null;
-                          }
-                        } else {
-                          console.log('Looking for repository projectV2 number', projectNumber, 'in', owner + '/' + repo);
-                          const queryRepo = `query($owner:String!, $repo:String!, $number:Int!){ repository(owner:$owner, name:$repo){ projectV2(number:$number){ id title } } }`;
-                          try {
-                            const qres = await github.graphql(queryRepo, { owner, repo, number: projectNumber });
-                            project = qres && qres.repository && qres.repository.projectV2;
-                          } catch (errQ) {
-                            console.log('GraphQL query for repository projectV2 failed, continuing to fallback. Error:', errQ.message || errQ);
-                            project = null;
-                          }
-                        }
-
-                        if (project && project.id) {
-                          console.log('Found project:', project.title, project.id);
-
-                          // Try to add to ProjectV2 first
-                          try {
-                            const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
-                            const mres = await github.graphql(mutation, { projectId: project.id, contentId: contentNodeId });
-                            console.log('ProjectV2 item created:', mres);
-                          // Get the project item id
-                          const projectItemId = mres && mres.addProjectV2ItemById && mres.addProjectV2ItemById.item && mres.addProjectV2ItemById.item.id;
-
-                          if (projectItemId) {
-                            console.log('Project item id:', projectItemId);
-                            // Query project's fields and options to find the single-select option named 'Backlog'
-                            const fieldsQuery = `query($projectId:ID!){ node(id:$projectId){ ... on ProjectV2 { fields(first:100){ nodes{ __typename id name ... on ProjectV2SingleSelectField{ options{ id name } } } } } }`;
-                            const fq = await github.graphql(fieldsQuery, { projectId: project.id });
-                            const nodes = fq && fq.node && fq.node.fields && fq.node.fields.nodes ? fq.node.fields.nodes : [];
-                            let targetFieldId = null;
-                            let targetOptionId = null;
-                            for (const f of nodes) {
-                              if (f.__typename === 'ProjectV2SingleSelectField' && f.options && Array.isArray(f.options)) {
-                                for (const opt of f.options) {
-                                  if (opt.name && opt.name.toLowerCase() === 'backlog') {
-                                    targetFieldId = f.id;
-                                    targetOptionId = opt.id;
-                                    break;
-                                  }
-                                }
-                                if (targetFieldId) break;
-                              } else if (f.__typename && f.name && f.name.toLowerCase().includes('status')) {
-                                // as fallback, if field name contains 'status', check its options if available
-                                if (f.options && Array.isArray(f.options)) {
-                                  for (const opt of f.options) {
-                                    if (opt.name && opt.name.toLowerCase() === 'backlog') {
-                                      targetFieldId = f.id;
-                                      targetOptionId = opt.id;
-                                      break;
-                                    }
-                                  }
-                                  if (targetFieldId) break;
-                                }
-                              }
-                            }
-
-                            if (targetFieldId && targetOptionId) {
-                              console.log('Setting project field', targetFieldId, 'to option', targetOptionId, 'for item', projectItemId);
-                              const setMutation = `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:ID!){ updateProjectV2ItemFieldValue(input:{projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{singleSelectOptionId:$optionId}}){ projectV2Item{ id } } }`;
-                              const setRes = await github.graphql(setMutation, { projectId: project.id, itemId: projectItemId, fieldId: targetFieldId, optionId: targetOptionId });
-                              console.log('Set field result:', setRes);
-                            } else {
-                              console.log('Could not find a single-select field option named Backlog in project; item will be added to default location.');
-                            }
-                          }
-
-                          return;
-                        } catch (errV2) {
-                          console.log('ProjectV2 add failed or not supported, falling back to Classic Projects. Error:', errV2.message || errV2);
-                        }
-
-                        // Fallback: Projects Classic (REST API)
-                        console.log('Attempting Projects Classic fallback...');
-                        // Find classic project by HTML URL number (list org projects)
+                        // First, try Projects Classic (REST API) because many orgs still use classic projects.
+                        console.log('Attempting Projects Classic (REST) lookup first (project number', projectNumber, ')');
                         let classicProject = null;
                         try {
-                          // Use REST API to list organization projects (requires permissions)
-                          // If a PROJECT_TOKEN secret is provided, instantiate an Octokit with it to ensure permissions
                           let projectsList;
                           if (process.env.PROJECT_TOKEN) {
+                            console.log('Using PROJECT_TOKEN to list organization projects');
                             const { Octokit } = require('@octokit/rest');
                             const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
                             projectsList = await oct.projects.listForOrg({ org: owner, per_page: 100 });
                           } else {
+                            console.log('Using GITHUB_TOKEN to list organization projects (may be limited)');
                             projectsList = await github.rest.projects.listForOrg({ org: owner, per_page: 100 });
                           }
                           const found = (projectsList.data || []).find(p => {
@@ -157,61 +75,141 @@ jobs:
                           });
                           classicProject = found || null;
                         } catch (errList) {
-                          console.log('Error listing organization projects:', errList.message || errList);
+                          console.log('Error listing organization projects (classic):', errList.message || errList);
                         }
 
-                        if (!classicProject) {
-                          throw new Error('Could not find classic project with number ' + projectNumber + ' in organization ' + owner);
-                        }
-
-                        console.log('Found classic project:', classicProject.name, classicProject.id, classicProject.html_url);
-                        // List columns
-                        let colsRes;
-                        if (process.env.PROJECT_TOKEN) {
-                          const { Octokit } = require('@octokit/rest');
-                          const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
-                          colsRes = await oct.projects.listColumns({ project_id: classicProject.id });
-                        } else {
-                          colsRes = await github.rest.projects.listColumns({ project_id: classicProject.id });
-                        }
-                        const cols = colsRes.data || [];
-                        if (!cols.length) throw new Error('No columns found in classic project ' + classicProject.id);
-                        // Prefer column named 'Backlog' (case-insensitive), otherwise fallback to first
-                        let column = cols.find(c => c.name && c.name.toLowerCase() === 'backlog');
-                        if (!column) {
-                          column = cols[0];
-                          console.log('Backlog column not found; falling back to first column:', column.name);
-                        } else {
-                          console.log('Found Backlog column:', column.name, column.id);
-                        }
-
-                        // Create card: if issue, link by content_id; if discussion, create note with link
-                        if (context.payload.issue) {
-                          const issueId = context.payload.issue.id; // numeric id
+                        if (classicProject && classicProject.id) {
+                          console.log('Found classic project:', classicProject.name, classicProject.id, classicProject.html_url);
+                          // List columns
+                          let colsRes;
                           if (process.env.PROJECT_TOKEN) {
                             const { Octokit } = require('@octokit/rest');
                             const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
-                            const cardRes = await oct.projects.createCard({ column_id: column.id, content_id: issueId });
-                            console.log('Created classic project card for issue:', cardRes.data.id);
+                            colsRes = await oct.projects.listColumns({ project_id: classicProject.id });
                           } else {
-                            const cardRes = await github.rest.projects.createCard({ column_id: column.id, content_id: issueId });
-                            console.log('Created classic project card for issue:', cardRes.data.id);
+                            colsRes = await github.rest.projects.listColumns({ project_id: classicProject.id });
                           }
-                          console.log('Created classic project card for issue:', cardRes.data.id);
-                        } else if (context.payload.discussion) {
-                          const discussionUrl = context.payload.discussion.html_url;
-                          const note = `Discussion: ${discussionUrl}`;
-                          if (process.env.PROJECT_TOKEN) {
-                            const { Octokit } = require('@octokit/rest');
-                            const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
-                            const cardRes = await oct.projects.createCard({ column_id: column.id, note });
-                            console.log('Created classic project note card for discussion:', cardRes.data.id);
+                          const cols = colsRes.data || [];
+                          if (!cols.length) throw new Error('No columns found in classic project ' + classicProject.id);
+                          // Prefer column named 'Backlog' (case-insensitive), otherwise fallback to first
+                          let column = cols.find(c => c.name && c.name.toLowerCase() === 'backlog');
+                          if (!column) {
+                            column = cols[0];
+                            console.log('Backlog column not found; falling back to first column:', column.name);
                           } else {
-                            const cardRes = await github.rest.projects.createCard({ column_id: column.id, note });
-                            console.log('Created classic project note card for discussion:', cardRes.data.id);
+                            console.log('Found Backlog column:', column.name, column.id);
+                          }
+
+                          // Create card: if issue, link by content_id; if discussion, create note with link
+                          if (context.payload.issue) {
+                            const issueId = context.payload.issue.id; // numeric id
+                            let cardRes;
+                            if (process.env.PROJECT_TOKEN) {
+                              const { Octokit } = require('@octokit/rest');
+                              const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
+                              cardRes = await oct.projects.createCard({ column_id: column.id, content_id: issueId });
+                            } else {
+                              cardRes = await github.rest.projects.createCard({ column_id: column.id, content_id: issueId });
+                            }
+                            console.log('Created classic project card for issue:', cardRes.data && cardRes.data.id);
+                            return;
+                          } else if (context.payload.discussion) {
+                            const discussionUrl = context.payload.discussion.html_url;
+                            const note = `Discussion: ${discussionUrl}`;
+                            let cardRes;
+                            if (process.env.PROJECT_TOKEN) {
+                              const { Octokit } = require('@octokit/rest');
+                              const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
+                              cardRes = await oct.projects.createCard({ column_id: column.id, note });
+                            } else {
+                              cardRes = await github.rest.projects.createCard({ column_id: column.id, note });
+                            }
+                            console.log('Created classic project note card for discussion:', cardRes.data && cardRes.data.id);
+                            return;
+                          } else {
+                            throw new Error('No issue or discussion payload to create classic project card');
+                          }
+                        }
+
+                        // If no classic project found, attempt ProjectV2 GraphQL path
+                        console.log('Classic project not found; attempting ProjectV2 GraphQL lookup now. PROJECT_TOKEN present?', !!process.env.PROJECT_TOKEN);
+                        // Depending on scope, query repository or organization for the ProjectV2
+                        let project = null;
+                        if ((process.env.PROJECT_SCOPE || 'repository').toLowerCase() === 'organization') {
+                          console.log('Looking for organization projectV2 number', projectNumber, 'in org', owner);
+                          const queryOrg = `query($org:String!, $number:Int!){ organization(login:$org){ projectV2(number:$number){ id title } } }`;
+                          try {
+                            const qres = await github.graphql(queryOrg, { org: owner, number: projectNumber });
+                            project = qres && qres.organization && qres.organization.projectV2;
+                          } catch (errQ) {
+                            console.log('GraphQL query for organization projectV2 failed:', errQ.message || errQ);
+                            project = null;
                           }
                         } else {
-                          throw new Error('No issue or discussion payload to create classic project card');
+                          console.log('Looking for repository projectV2 number', projectNumber, 'in', owner + '/' + repo);
+                          const queryRepo = `query($owner:String!, $repo:String!, $number:Int!){ repository(owner:$owner, name:$repo){ projectV2(number:$number){ id title } } }`;
+                          try {
+                            const qres = await github.graphql(queryRepo, { owner, repo, number: projectNumber });
+                            project = qres && qres.repository && qres.repository.projectV2;
+                          } catch (errQ) {
+                            console.log('GraphQL query for repository projectV2 failed:', errQ.message || errQ);
+                            project = null;
+                          }
+                        }
+
+                        if (project && project.id) {
+                          console.log('Found ProjectV2:', project.title, project.id);
+                          try {
+                            const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
+                            const mres = await github.graphql(mutation, { projectId: project.id, contentId: contentNodeId });
+                            console.log('ProjectV2 item created:', mres);
+                            const projectItemId = mres && mres.addProjectV2ItemById && mres.addProjectV2ItemById.item && mres.addProjectV2ItemById.item.id;
+
+                            if (projectItemId) {
+                              console.log('Project item id:', projectItemId);
+                              // Query project's fields and options to find the single-select option named 'Backlog'
+                              const fieldsQuery = `query($projectId:ID!){ node(id:$projectId){ ... on ProjectV2 { fields(first:100){ nodes{ __typename id name ... on ProjectV2SingleSelectField{ options{ id name } } } } } }`;
+                              const fq = await github.graphql(fieldsQuery, { projectId: project.id });
+                              const nodes = fq && fq.node && fq.node.fields && fq.node.fields.nodes ? fq.node.fields.nodes : [];
+                              let targetFieldId = null;
+                              let targetOptionId = null;
+                              for (const f of nodes) {
+                                if (f.__typename === 'ProjectV2SingleSelectField' && f.options && Array.isArray(f.options)) {
+                                  for (const opt of f.options) {
+                                    if (opt.name && opt.name.toLowerCase() === 'backlog') {
+                                      targetFieldId = f.id;
+                                      targetOptionId = opt.id;
+                                      break;
+                                    }
+                                  }
+                                  if (targetFieldId) break;
+                                } else if (f.__typename && f.name && f.name.toLowerCase().includes('status')) {
+                                  if (f.options && Array.isArray(f.options)) {
+                                    for (const opt of f.options) {
+                                      if (opt.name && opt.name.toLowerCase() === 'backlog') {
+                                        targetFieldId = f.id;
+                                        targetOptionId = opt.id;
+                                        break;
+                                      }
+                                    }
+                                    if (targetFieldId) break;
+                                  }
+                                }
+                              }
+
+                              if (targetFieldId && targetOptionId) {
+                                console.log('Setting project field', targetFieldId, 'to option', targetOptionId, 'for item', projectItemId);
+                                const setMutation = `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:ID!){ updateProjectV2ItemFieldValue(input:{projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{singleSelectOptionId:$optionId}}){ projectV2Item{ id } } }`;
+                                const setRes = await github.graphql(setMutation, { projectId: project.id, itemId: projectItemId, fieldId: targetFieldId, optionId: targetOptionId });
+                                console.log('Set field result:', setRes);
+                              } else {
+                                console.log('Could not find a single-select field option named Backlog in ProjectV2; item added to default location.');
+                              }
+                            }
+                            return;
+                          } catch (errV2) {
+                            console.log('ProjectV2 add failed:', errV2.message || errV2);
+                          }
                         }
                       } catch (err) {
                         console.log('Error adding to project:', err.message || err);
