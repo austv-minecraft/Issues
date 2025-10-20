@@ -109,7 +109,16 @@ jobs:
                   }
                   console.log(`Trying fallback lookup: owner=${owner}, number=${number}`);
                   const fb = await gql(
-                    'query($owner:String!,$number:Int!){\n                      organization(login:$owner){ project(number:$number){ id name } projectV2(number:$number){ id title number } projectsV2(first:100){ nodes{ id title number } } }\n                      user(login:$owner){ projectV2(number:$number){ id title number } }\n                    }',
+                    `query($owner:String!,$number:Int!){
+                      organization(login:$owner){
+                        project(number:$number){ id name }
+                        projectV2(number:$number){ id title number }
+                        projectsV2(first:100){ nodes{ id title number } }
+                      }
+                      user(login:$owner){
+                        projectV2(number:$number){ id title number }
+                      }
+                    }`,
                     { owner, number }
                   );
                   const orgProj = fb?.data?.organization?.projectV2;
