@@ -3,6 +3,12 @@ name: Add issue to Project Backlog
 on:
   issues:
     types: [opened]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run diagnostics only (no add)?"
+        required: false
+        default: "false"
 
 # Observação: o acesso de escrita ao Project v2 é feito via PROJECT_TOKEN (PAT).
 # As permissões abaixo se aplicam ao GITHUB_TOKEN apenas e são mantidas mínimas.
@@ -20,6 +26,8 @@ jobs:
           # Número e ID do Project v2
           PROJECT_NUMBER: "21"
           PROJECT_ID: "PVT_kwDOCV9Tw84BF9Ag"
+          # Dono do projeto (org ou user) - sobrescreve o owner detectado do repositório
+          PROJECT_OWNER: "austv-minecraft"
           # PAT com permissões adequadas (project, repo, read:org)
           PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         with:
@@ -94,21 +102,43 @@ jobs:
                 } catch (preErr) {
                   console.log(`Preflight by id failed: ${preErr.message || preErr}`);
                   // Fallback: tentar resolver pelo owner do repositório + PROJECT_NUMBER
-                  const owner = context.payload.repository?.owner?.login || context.repo.owner;
+                  const owner = process.env.PROJECT_OWNER || context.payload.repository?.owner?.login || context.repo.owner;
                   const number = parseInt(process.env.PROJECT_NUMBER || '0', 10);
                   if (!owner || !Number.isInteger(number) || number <= 0) {
                     throw new Error('Fallback requires valid owner and PROJECT_NUMBER.');
                   }
                   console.log(`Trying fallback lookup: owner=${owner}, number=${number}`);
                   const fb = await gql(
+<<<<<<< HEAD
                     'query($owner:String!,$number:Int!){\n                      organization(login:$owner){ projectV2(number:$number){ id title } }\n                      user(login:$owner){ projectV2(number:$number){ id title } }\n                    }',
+=======
+                    'query($owner:String!,$number:Int!){\n                      organization(login:$owner){ project(number:$number){ id name } projectV2(number:$number){ id title number } projectsV2(first:100){ nodes{ id title number } } }\n                      user(login:$owner){ projectV2(number:$number){ id title number } }\n                    }',
+>>>>>>> 94a4e9f (chore: remove leaked token from workflow)
                     { owner, number }
                   );
                   const orgProj = fb?.data?.organization?.projectV2;
                   const userProj = fb?.data?.user?.projectV2;
+<<<<<<< HEAD
                   const found = orgProj || userProj;
                   if (!found) {
                     throw new Error(`Could not resolve ProjectV2 by owner+number. Check if project #${number} exists under ${owner}, is Project v2 (not Classic), and PAT has access (org membership + SSO + added to project).`);
+=======
+                  const orgClassic = fb?.data?.organization?.project;
+                  let found = orgProj || userProj;
+                  if (!found) {
+                    const orgList = fb?.data?.organization?.projectsV2?.nodes || [];
+                    const byNumber = orgList.find(p => p?.number === number);
+                    if (byNumber) {
+                      console.log(`Discovered via org projects list: ${byNumber.title} (#${byNumber.number}) -> ${byNumber.id}`);
+                      found = byNumber;
+                    }
+                  }
+                  if (!found) {
+                    if (orgClassic?.id) {
+                      throw new Error(`Project #${number} under ${owner} appears to be a Classic project (GraphQL type Project). This workflow targets Project v2 only. Migrate to Projects (v2) or create a new Project v2 and update PROJECT_NUMBER/ID.`);
+                    }
+                    throw new Error(`Could not resolve ProjectV2 by owner+number. Ensure project #${number} exists under ${owner}, PAT user can see the org and the project (org membership + SSO), and the PAT user is added to the Project v2 with Write. Also confirm the repo owner matches the project owner or set PROJECT_OWNER explicitly.`);
+>>>>>>> 94a4e9f (chore: remove leaked token from workflow)
                   }
                   projNode = { __typename: 'ProjectV2', id: found.id, title: found.title };
                   if (projectId !== found.id) {
@@ -117,6 +147,13 @@ jobs:
                   }
                 }
                 console.log('Target ProjectV2:', projNode.title, `(#${process.env.PROJECT_NUMBER})`, projectId);
+
+                // Se rodando como dry-run, termine após diagnosticar o projeto
+                const dryRun = (core.getInput('dry_run') || process.env.DRY_RUN || 'false').toString().toLowerCase() === 'true';
+                if (dryRun) {
+                  console.log('Dry-run enabled; skipping add and status update.');
+                  return;
+                }
 
                 // Preflight: conteúdo é Issue?
                 const contentCheck = await gql(
