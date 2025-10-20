@@ -213,7 +213,7 @@ jobs:
                 let targetOptionId = null;
                 for (const f of nodes) {
                   if (f.__typename === 'ProjectV2SingleSelectField' && Array.isArray(f.options)) {
-                    const opt = f.options.find(o => o.name && o.name.toLowerCase() === 'backlog');
+                    const opt = f.options.find(o => o.name === 'Backlog');
                     if (opt) { targetFieldId = f.id; targetOptionId = opt.id; break; }
                   }
                 }
