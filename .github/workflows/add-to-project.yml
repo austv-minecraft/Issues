@@ -38,6 +38,8 @@ jobs:
             PROJECT_NUMBER: 21
             # Opcional: id interno do Classic Project (use para pular a busca automática)
             PROJECT_ID: ${{ secrets.PROJECT_ID }}
+            # Opcional: node id do ProjectV2 (GraphQL ID). Se fornecido, será usado diretamente.
+            PROJECT_V2_ID: ${{ secrets.PROJECT_V2_ID }}
             # Opcional: URL HTML do projeto (ex: https://github.com/orgs/austv-minecraft/projects/21)
             PROJECT_HTML_URL: ""
             # Escopo do projeto: 'repository' ou 'organization'
@@ -87,6 +89,47 @@ jobs:
                         const projectNumber = parseInt(process.env.PROJECT_NUMBER, 10);
                         if (!projectNumber || isNaN(projectNumber)) {
                           throw new Error('PROJECT_NUMBER env var not set to a valid number. Edit workflow to set PROJECT_NUMBER to your Project v2 number.');
+                        }
+
+                        // If PROJECT_V2_ID is provided, prefer adding directly to ProjectV2 (new Projects) via GraphQL.
+                        if (process.env.PROJECT_V2_ID) {
+                          console.log('PROJECT_V2_ID provided; attempting to add item directly to ProjectV2', process.env.PROJECT_V2_ID);
+                          try {
+                            const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
+                            const mres = await github.graphql(mutation, { projectId: process.env.PROJECT_V2_ID, contentId: contentNodeId });
+                            const projectItemId = mres && mres.addProjectV2ItemById && mres.addProjectV2ItemById.item && mres.addProjectV2ItemById.item.id;
+                            console.log('ProjectV2 item created (direct):', projectItemId);
+                            if (projectItemId) {
+                              // try set Backlog single-select option
+                              const fieldsQuery = `query($projectId:ID!){ node(id:$projectId){ ... on ProjectV2 { fields(first:100){ nodes{ __typename id name ... on ProjectV2SingleSelectField{ options{ id name } } } } } }`;
+                              const fq = await github.graphql(fieldsQuery, { projectId: process.env.PROJECT_V2_ID });
+                              const nodes = fq && fq.node && fq.node.fields && fq.node.fields.nodes ? fq.node.fields.nodes : [];
+                              let targetFieldId = null;
+                              let targetOptionId = null;
+                              for (const f of nodes) {
+                                if (f.__typename === 'ProjectV2SingleSelectField' && f.options && Array.isArray(f.options)) {
+                                  for (const opt of f.options) {
+                                    if (opt.name && opt.name.toLowerCase() === 'backlog') {
+                                      targetFieldId = f.id;
+                                      targetOptionId = opt.id;
+                                      break;
+                                    }
+                                  }
+                                  if (targetFieldId) break;
+                                }
+                              }
+                              if (targetFieldId && targetOptionId) {
+                                const setMutation = `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:ID!){ updateProjectV2ItemFieldValue(input:{projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{singleSelectOptionId:$optionId}}){ projectV2Item{ id } } }`;
+                                const setRes = await github.graphql(setMutation, { projectId: process.env.PROJECT_V2_ID, itemId: projectItemId, fieldId: targetFieldId, optionId: targetOptionId });
+                                console.log('Set ProjectV2 field result (direct):', setRes);
+                              } else {
+                                console.log('Could not find Backlog option on ProjectV2 (direct add)');
+                              }
+                            }
+                            return;
+                          } catch (errPV2) {
+                            console.log('Direct ProjectV2 add failed:', errPV2 && (errPV2.message || errPV2));
+                          }
                         }
 
                         // First, try Projects Classic (REST API) because many orgs still use classic projects.
