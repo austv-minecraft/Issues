@@ -76,10 +76,12 @@ jobs:
                         try {
                           let projectsList;
                           if (process.env.PROJECT_TOKEN) {
-                            console.log('Using PROJECT_TOKEN to list organization projects');
-                            const { Octokit } = require('@octokit/rest');
-                            const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
-                            projectsList = await oct.projects.listForOrg({ org: owner, per_page: 100 });
+                            console.log('Using PROJECT_TOKEN to list organization projects via REST');
+                            projectsList = await github.request('GET /orgs/{org}/projects', {
+                              org: owner,
+                              per_page: 100,
+                              headers: { authorization: `token ${process.env.PROJECT_TOKEN}` }
+                            });
                           } else {
                             console.log('Using GITHUB_TOKEN to list organization projects (may be limited)');
                             projectsList = await github.rest.projects.listForOrg({ org: owner, per_page: 100 });
@@ -101,9 +103,10 @@ jobs:
                           // List columns
                           let colsRes;
                           if (process.env.PROJECT_TOKEN) {
-                            const { Octokit } = require('@octokit/rest');
-                            const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
-                            colsRes = await oct.projects.listColumns({ project_id: classicProject.id });
+                            colsRes = await github.request('GET /projects/{project_id}/columns', {
+                              project_id: classicProject.id,
+                              headers: { authorization: `token ${process.env.PROJECT_TOKEN}` }
+                            });
                           } else {
                             colsRes = await github.rest.projects.listColumns({ project_id: classicProject.id });
                           }
@@ -123,26 +126,31 @@ jobs:
                             const issueId = context.payload.issue.id; // numeric id
                             let cardRes;
                             if (process.env.PROJECT_TOKEN) {
-                              const { Octokit } = require('@octokit/rest');
-                              const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
-                              cardRes = await oct.projects.createCard({ column_id: column.id, content_id: issueId });
+                              const cardRes = await github.request('POST /projects/columns/{column_id}/cards', {
+                                column_id: column.id,
+                                content_id: issueId,
+                                headers: { authorization: `token ${process.env.PROJECT_TOKEN}` }
+                              });
+                              console.log('Created classic project card for issue:', cardRes.data && cardRes.data.id);
                             } else {
-                              cardRes = await github.rest.projects.createCard({ column_id: column.id, content_id: issueId });
+                              const cardRes = await github.rest.projects.createCard({ column_id: column.id, content_id: issueId });
+                              console.log('Created classic project card for issue:', cardRes.data && cardRes.data.id);
                             }
-                            console.log('Created classic project card for issue:', cardRes.data && cardRes.data.id);
                             return;
                           } else if (context.payload.discussion) {
                             const discussionUrl = context.payload.discussion.html_url;
                             const note = `Discussion: ${discussionUrl}`;
-                            let cardRes;
                             if (process.env.PROJECT_TOKEN) {
-                              const { Octokit } = require('@octokit/rest');
-                              const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
-                              cardRes = await oct.projects.createCard({ column_id: column.id, note });
+                              const cardRes = await github.request('POST /projects/columns/{column_id}/cards', {
+                                column_id: column.id,
+                                note,
+                                headers: { authorization: `token ${process.env.PROJECT_TOKEN}` }
+                              });
+                              console.log('Created classic project note card for discussion:', cardRes.data && cardRes.data.id);
                             } else {
-                              cardRes = await github.rest.projects.createCard({ column_id: column.id, note });
+                              const cardRes = await github.rest.projects.createCard({ column_id: column.id, note });
+                              console.log('Created classic project note card for discussion:', cardRes.data && cardRes.data.id);
                             }
-                            console.log('Created classic project note card for discussion:', cardRes.data && cardRes.data.id);
                             return;
                           } else {
                             throw new Error('No issue or discussion payload to create classic project card');
