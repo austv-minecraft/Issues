@@ -30,8 +30,9 @@ jobs:
           PROJECT_OWNER: "austv-minecraft"
           # PAT com permissões adequadas (project, repo, read:org)
           # Tente múltiplos nomes de secret como fallback
-          PROJECT_TOKEN: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
+          MY_PAT_TOKEN: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
         with:
+          github-token: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
           script: |
             // 1) Validar payload
             const issueNodeId = context.payload.issue?.node_id;
@@ -41,12 +42,12 @@ jobs:
             }
 
             // 2) Validar disponibilidade do PAT
-            const token = process.env.PROJECT_TOKEN;
+            const token = process.env.MY_PAT_TOKEN;
             if (!token) {
-              core.setFailed('PROJECT_TOKEN secret is not set. Provide a PAT with project/repo/read:org.');
+              core.setFailed('MY_PAT_TOKEN secret is not set. Provide a PAT with project/repo/read:org.');
               return;
             }
-            console.log('PROJECT_TOKEN present: true');
+            console.log('MY_PAT_TOKEN present: true');
             console.log('Token length:', token.length);
             console.log('Token prefix:', token.substring(0, 7) + '...');
             console.log('Token suffix:', '...' + token.substring(token.length - 4));
