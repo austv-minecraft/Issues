@@ -2,4 +2,4 @@ blank_issues_enabled: false
 contact_links:
   - name: "Ideia"
     about: "Tive uma ideia e vamos registrar"
-    url: "https://github.com/austv-minecraft/AusTv/discussions/new?category=ideia"
+    url: "https://github.com/austv-minecraft/Issues/discussions/new?category=ideias"

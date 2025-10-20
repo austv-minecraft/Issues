@@ -1,0 +1,62 @@
+labels: ['bug: não confirmado']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar um bug! Para nos ajudar a reproduzir e consertar mais rápido, preencha os campos abaixo com o máximo de detalhes possível.
+  - type: input
+    id: resumo
+    attributes:
+      label: Resumo do bug
+      description: Um título curto e objetivo do problema.
+      placeholder: Ex. Jogador não recebe XP ao derrotar monstros
+    validations:
+      required: true
+  - type: input
+    id: ambiente
+    attributes:
+      label: Ambiente / Versão
+      description: Informe versão do server/cliente, plugins, plataforma, etc.
+    validations:
+      required: false
+  - type: textarea
+    id: passos
+    attributes:
+      label: Passos para reproduzir
+      description: Liste passos numerados para que possamos reproduzir o bug.
+    validations:
+      required: true
+  - type: textarea
+    id: comportamento_esperado
+    attributes:
+      label: Comportamento esperado
+      description: O que deveria acontecer em condições normais.
+    validations:
+      required: true
+  - type: textarea
+    id: comportamento_atual
+    attributes:
+      label: Comportamento atual
+      description: O que acontece na prática quando o bug ocorre.
+    validations:
+      required: true
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Logs / Prints / Anexos
+      description: Cole logs, prints ou links que ajudem a diagnosticar.
+    validations:
+      required: false
+  - type: dropdown
+    id: severidade
+    attributes:
+      label: Severidade
+      description: Como este bug impacta o uso do projeto?
+      options:
+        - Baixa
+        - Média
+        - Alta
+        - Crítica
+      default: 1
+    validations:
+      required: false
