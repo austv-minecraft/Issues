@@ -91,18 +91,42 @@ jobs:
                           throw new Error('PROJECT_NUMBER env var not set to a valid number. Edit workflow to set PROJECT_NUMBER to your Project v2 number.');
                         }
 
+                        // Helper: use PAT PROJECT_TOKEN for GraphQL calls when provided to avoid "Resource not accessible by integration"
+                        async function callGraphQLWithPAT(query, variables) {
+                          if (!process.env.PROJECT_TOKEN) {
+                            // use default octokit graphql client which uses the GITHUB_TOKEN
+                            return await github.graphql(query, variables);
+                          }
+                          const url = 'https://api.github.com/graphql';
+                          const body = JSON.stringify({ query, variables });
+                          const res = await github.request({
+                            method: 'POST',
+                            url: url,
+                            headers: {
+                              authorization: `bearer ${process.env.PROJECT_TOKEN}`,
+                              'content-type': 'application/json'
+                            },
+                            data: body
+                          }).catch(e => { throw e; });
+                          // octokit.request returns a response with data in `.data` for REST; for GraphQL it returns the parsed JSON in `.data`
+                          return res.data;
+                        }
+
                         // If PROJECT_V2_ID is provided, prefer adding directly to ProjectV2 (new Projects) via GraphQL.
                         if (process.env.PROJECT_V2_ID) {
                           console.log('PROJECT_V2_ID provided; attempting to add item directly to ProjectV2', process.env.PROJECT_V2_ID);
                           try {
                             const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
-                            const mres = await github.graphql(mutation, { projectId: process.env.PROJECT_V2_ID, contentId: contentNodeId });
-                            const projectItemId = mres && mres.addProjectV2ItemById && mres.addProjectV2ItemById.item && mres.addProjectV2ItemById.item.id;
+                            const mres = await callGraphQLWithPAT(mutation, { projectId: process.env.PROJECT_V2_ID, contentId: contentNodeId });
+                            // mres may be the GraphQL root object or an object with data; normalize
+                            const mdata = mres.data || mres;
+                            const projectItemId = mdata && mdata.addProjectV2ItemById && mdata.addProjectV2ItemById.item && mdata.addProjectV2ItemById.item.id;
                             console.log('ProjectV2 item created (direct):', projectItemId);
                             if (projectItemId) {
                               // try set Backlog single-select option
                               const fieldsQuery = `query($projectId:ID!){ node(id:$projectId){ ... on ProjectV2 { fields(first:100){ nodes{ __typename id name ... on ProjectV2SingleSelectField{ options{ id name } } } } } }`;
-                              const fq = await github.graphql(fieldsQuery, { projectId: process.env.PROJECT_V2_ID });
+                              const fqRaw = await callGraphQLWithPAT(fieldsQuery, { projectId: process.env.PROJECT_V2_ID });
+                              const fq = fqRaw.data || fqRaw;
                               const nodes = fq && fq.node && fq.node.fields && fq.node.fields.nodes ? fq.node.fields.nodes : [];
                               let targetFieldId = null;
                               let targetOptionId = null;
@@ -120,7 +144,8 @@ jobs:
                               }
                               if (targetFieldId && targetOptionId) {
                                 const setMutation = `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:ID!){ updateProjectV2ItemFieldValue(input:{projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{singleSelectOptionId:$optionId}}){ projectV2Item{ id } } }`;
-                                const setRes = await github.graphql(setMutation, { projectId: process.env.PROJECT_V2_ID, itemId: projectItemId, fieldId: targetFieldId, optionId: targetOptionId });
+                                const setRaw = await callGraphQLWithPAT(setMutation, { projectId: process.env.PROJECT_V2_ID, itemId: projectItemId, fieldId: targetFieldId, optionId: targetOptionId });
+                                const setRes = setRaw.data || setRaw;
                                 console.log('Set ProjectV2 field result (direct):', setRes);
                               } else {
                                 console.log('Could not find Backlog option on ProjectV2 (direct add)');
@@ -129,6 +154,9 @@ jobs:
                             return;
                           } catch (errPV2) {
                             console.log('Direct ProjectV2 add failed:', errPV2 && (errPV2.message || errPV2));
+                            if (errPV2 && errPV2.message && errPV2.message.includes('Resource not accessible by integration')) {
+                              console.log('GraphQL failed with Resource not accessible by integration — ensure PROJECT_TOKEN is a PAT with proper scopes and added as a repository secret.');
+                            }
                           }
                         }
 
