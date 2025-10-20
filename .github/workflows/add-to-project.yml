@@ -1,89 +1,131 @@
 name: Add issue/discussion to Project v2
 
 on:
-  issues:
-    types: [opened]
-  discussion:
-    types: [created]
+    issues:
+        types: [opened]
+    discussion:
+        types: [created]
 
 permissions:
-  issues: write
-  discussions: write
+    issues: write
+    discussions: write
 
 jobs:
-  add-to-project:
-    runs-on: ubuntu-latest
-    env:
-      PROJECT_NUMBER: 21
-      PROJECT_SCOPE: organization
-      PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+    add-to-project:
+        runs-on: ubuntu-latest
+        env:
+            PROJECT_NUMBER: 21
+            PROJECT_SCOPE: organization
+            # Opcional: node id do ProjectV2 (GraphQL ID) para pular a busca por número
+            PROJECT_V2_ID: ${{ secrets.PROJECT_V2_ID }}
+            PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
 
-    steps:
-      - name: Adicionar issue/discussão ao Project v2 da AusTV
-        uses: actions/github-script@v6
-        with:
-          script: |
-            try {
-              const owner = context.repo.owner;
-              const repo = context.repo.repo;
+        steps:
+            - name: Adicionar issue/discussão ao Project v2 da AusTV
+              uses: actions/github-script@v6
+              with:
+                  script: |
+                      try {
+                        const owner = context.repo.owner;
+                        const repo = context.repo.repo;
 
-              let contentNodeId = null;
-              if (context.payload.issue) {
-                contentNodeId = context.payload.issue.node_id;
-                console.log('Event: issue opened, node_id=', contentNodeId);
-              } else if (context.payload.discussion) {
-                contentNodeId = context.payload.discussion.node_id;
-                console.log('Event: discussion created, node_id=', contentNodeId);
-              } else {
-                console.log('No issue or discussion found in payload; exiting.');
-                return;
-              }
+                        let contentNodeId = null;
+                        if (context.payload.issue) {
+                          contentNodeId = context.payload.issue.node_id;
+                          console.log('Event: issue opened, node_id=', contentNodeId);
+                        } else if (context.payload.discussion) {
+                          contentNodeId = context.payload.discussion.node_id;
+                          console.log('Event: discussion created, node_id=', contentNodeId);
+                        } else {
+                          console.log('No issue or discussion found in payload; exiting.');
+                          return;
+                        }
 
-              if (!contentNodeId) throw new Error('Content node id not found in payload');
+                        if (!contentNodeId) throw new Error('Content node id not found in payload');
 
-              const projectNumber = parseInt(process.env.PROJECT_NUMBER, 10);
-              if (!projectNumber || isNaN(projectNumber)) {
-                throw new Error('PROJECT_NUMBER not set to a valid number.');
-              }
+                        const projectNumber = parseInt(process.env.PROJECT_NUMBER, 10);
+                        if (!projectNumber || isNaN(projectNumber)) {
+                          throw new Error('PROJECT_NUMBER not set to a valid number.');
+                        }
 
-              async function callGraphQL(query, variables) {
-                if (!process.env.PROJECT_TOKEN) {
-                  return await github.graphql(query, variables);
-                }
-                const url = 'https://api.github.com/graphql';
-                const res = await github.request({
-                  method: 'POST',
-                  url,
-                  headers: {
-                    authorization: `bearer ${process.env.PROJECT_TOKEN}`,
-                    'content-type': 'application/json'
-                  },
-                  data: { query, variables }
-                });
-                return res.data;
-              }
+                        async function callGraphQL(query, variables) {
+                          if (!process.env.PROJECT_TOKEN) {
+                            return await github.graphql(query, variables);
+                          }
+                          const url = 'https://api.github.com/graphql';
+                          const res = await github.request({
+                            method: 'POST',
+                            url,
+                            headers: {
+                              authorization: `bearer ${process.env.PROJECT_TOKEN}`,
+                              'content-type': 'application/json'
+                            },
+                            data: { query, variables }
+                          });
+                          const payload = res.data;
+                          if (payload && payload.errors && payload.errors.length) {
+                            console.log('GraphQL errors:', JSON.stringify(payload.errors));
+                            const first = payload.errors[0];
+                            throw new Error(first && first.message ? first.message : 'GraphQL returned errors');
+                          }
+                          return payload;
+                        }
 
-              // Buscar o projeto
-              let project = null;
-              if ((process.env.PROJECT_SCOPE || 'repository').toLowerCase() === 'organization') {
-                const query = `query($org:String!, $number:Int!){ organization(login:$org){ projectV2(number:$number){ id title } } }`;
-                const qres = await callGraphQL(query, { org: owner, number: projectNumber });
-                project = qres.data?.organization?.projectV2;
-              } else {
-                const query = `query($owner:String!, $repo:String!, $number:Int!){ repository(owner:$owner, name:$repo){ projectV2(number:$number){ id title } } }`;
-                const qres = await callGraphQL(query, { owner, repo, number: projectNumber });
-                project = qres.data?.repository?.projectV2;
-              }
+                        // Resolver o ID do ProjectV2
+                        let projectId = process.env.PROJECT_V2_ID || null;
+                        if (projectId) {
+                          console.log('Using PROJECT_V2_ID from secret to target project:', projectId);
+                        } else {
+                          let project = null;
+                          if ((process.env.PROJECT_SCOPE || 'repository').toLowerCase() === 'organization') {
+                            const query = `query($org:String!, $number:Int!){ organization(login:$org){ projectV2(number:$number){ id title } } }`;
+                            const qres = await callGraphQL(query, { org: owner, number: projectNumber });
+                            project = qres.data?.organization?.projectV2;
+                          } else {
+                            const query = `query($owner:String!, $repo:String!, $number:Int!){ repository(owner:$owner, name:$repo){ projectV2(number:$number){ id title } } }`;
+                            const qres = await callGraphQL(query, { owner, repo, number: projectNumber });
+                            project = qres.data?.repository?.projectV2;
+                          }
+                          if (!project?.id) throw new Error('Project v2 not found. Configure PROJECT_V2_ID or check permissions.');
+                          console.log('Found project:', project.title);
+                          projectId = project.id;
+                        }
 
-              if (!project?.id) throw new Error('Project v2 not found.');
+                        // Adicionar item
+                        const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
+                        const mres = await callGraphQL(mutation, { projectId: projectId, contentId: contentNodeId });
+                        console.log('Item added to project:', JSON.stringify(mres));
 
-              console.log('Found project:', project.title);
-
-              // Adicionar item
-              const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
-              const mres = await callGraphQL(mutation, { projectId: project.id, contentId: contentNodeId });
-              console.log('Item added to project:', mres);
-            } catch (err) {
-              console.log('Error:', err.message || err);
-              throw err;
-            }
+                        // Tenta definir o campo Backlog se existir como Single Select
+                        const projectItemId = mres?.data?.addProjectV2ItemById?.item?.id;
+                        if (projectItemId) {
+                          try {
+                            const fieldsQuery = `query($projectId:ID!){ node(id:$projectId){ ... on ProjectV2 { fields(first:100){ nodes{ __typename id name ... on ProjectV2SingleSelectField{ options{ id name } } } } } } }`;
+                            const fq = await callGraphQL(fieldsQuery, { projectId });
+                            const nodes = fq?.data?.node?.fields?.nodes || [];
+                            let targetFieldId = null, targetOptionId = null;
+                            for (const f of nodes) {
+                              if (f.__typename === 'ProjectV2SingleSelectField' && Array.isArray(f.options)) {
+                                const opt = f.options.find(o => o.name && o.name.toLowerCase() === 'backlog');
+                                if (opt) { targetFieldId = f.id; targetOptionId = opt.id; break; }
+                              }
+                              if (!targetFieldId && f.name && f.name.toLowerCase().includes('status') && Array.isArray(f.options)) {
+                                const opt = f.options.find(o => o.name && o.name.toLowerCase() === 'backlog');
+                                if (opt) { targetFieldId = f.id; targetOptionId = opt.id; break; }
+                              }
+                            }
+                            if (targetFieldId && targetOptionId) {
+                              const setMutation = `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:ID!){ updateProjectV2ItemFieldValue(input:{projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{singleSelectOptionId:$optionId}}){ projectV2Item{ id } } }`;
+                              const setRes = await callGraphQL(setMutation, { projectId, itemId: projectItemId, fieldId: targetFieldId, optionId: targetOptionId });
+                              console.log('Backlog set result:', JSON.stringify(setRes));
+                            } else {
+                              console.log('Backlog option not found in project fields; skipping status update.');
+                            }
+                          } catch (setErr) {
+                            console.log('Setting Backlog field failed:', setErr.message || setErr);
+                          }
+                        }
+                      } catch (err) {
+                        console.log('Error:', err.message || err);
+                        throw err;
+                      }
