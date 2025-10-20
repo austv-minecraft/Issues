@@ -1,0 +1,78 @@
+name: Add issue/discussion to Project v2
+
+on:
+    issues:
+        types: [opened]
+    discussion:
+        types: [created]
+
+permissions:
+    issues: write
+    discussions: write
+    # projects permission is not universally allowed in workflow manifest; the GraphQL API uses the repo token
+
+jobs:
+    add-to-project:
+        runs-on: ubuntu-latest
+        env:
+            # Configure aqui o número do Project V2 (o número visível na URL do project)
+            # Exemplo: para https://github.com/orgs/austv-minecraft/projects/21 use 21
+            PROJECT_NUMBER: 21
+            # Escopo do projeto: 'repository' ou 'organization'
+            PROJECT_SCOPE: organization
+
+        steps:
+            - name: Adiciona ao projeto austv
+              uses: actions/github-script@v6
+              with:
+                  script: |
+                      try {
+                        const owner = context.repo.owner;
+                        const repo = context.repo.repo;
+
+                        // Determine content node id from event payload
+                        let contentNodeId = null;
+                        if (context.payload.issue) {
+                          contentNodeId = context.payload.issue.node_id;
+                          console.log('Event: issue opened, node_id=', contentNodeId);
+                        } else if (context.payload.discussion) {
+                          contentNodeId = context.payload.discussion.node_id;
+                          console.log('Event: discussion created, node_id=', contentNodeId);
+                        } else {
+                          console.log('No issue or discussion found in payload; exiting.');
+                          return;
+                        }
+
+                        if (!contentNodeId) throw new Error('Content node id not found in payload');
+
+                        const projectNumber = parseInt(process.env.PROJECT_NUMBER, 10);
+                        if (!projectNumber || isNaN(projectNumber)) {
+                          throw new Error('PROJECT_NUMBER env var not set to a valid number. Edit workflow to set PROJECT_NUMBER to your Project v2 number.');
+                        }
+
+                        // Depending on scope, query repository or organization for the ProjectV2
+                        let project = null;
+                        if ((process.env.PROJECT_SCOPE || 'repository').toLowerCase() === 'organization') {
+                          console.log('Looking for organization projectV2 number', projectNumber, 'in org', owner);
+                          const queryOrg = `query($org:String!, $number:Int!){ organization(login:$org){ projectV2(number:$number){ id title } } }`;
+                          const qres = await github.graphql(queryOrg, { org: owner, number: projectNumber });
+                          project = qres && qres.organization && qres.organization.projectV2;
+                        } else {
+                          console.log('Looking for repository projectV2 number', projectNumber, 'in', owner + '/' + repo);
+                          const queryRepo = `query($owner:String!, $repo:String!, $number:Int!){ repository(owner:$owner, name:$repo){ projectV2(number:$number){ id title } } }`;
+                          const qres = await github.graphql(queryRepo, { owner, repo, number: projectNumber });
+                          project = qres && qres.repository && qres.repository.projectV2;
+                        }
+
+                        if (!project || !project.id) throw new Error('ProjectV2 not found for number ' + projectNumber + ' (scope=' + (process.env.PROJECT_SCOPE || 'repository') + ')');
+
+                        console.log('Found project:', project.title, project.id);
+
+                        // Add the issue/discussion to the project
+                        const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
+                        const mres = await github.graphql(mutation, { projectId: project.id, contentId: contentNodeId });
+                        console.log('Project item created:', mres);
+                      } catch (err) {
+                        console.log('Error adding to project:', err.message || err);
+                        throw err;
+                      }
