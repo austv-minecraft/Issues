@@ -55,24 +55,33 @@ jobs:
                         if ((process.env.PROJECT_SCOPE || 'repository').toLowerCase() === 'organization') {
                           console.log('Looking for organization projectV2 number', projectNumber, 'in org', owner);
                           const queryOrg = `query($org:String!, $number:Int!){ organization(login:$org){ projectV2(number:$number){ id title } } }`;
-                          const qres = await github.graphql(queryOrg, { org: owner, number: projectNumber });
-                          project = qres && qres.organization && qres.organization.projectV2;
+                          try {
+                            const qres = await github.graphql(queryOrg, { org: owner, number: projectNumber });
+                            project = qres && qres.organization && qres.organization.projectV2;
+                          } catch (errQ) {
+                            console.log('GraphQL query for organization projectV2 failed, continuing to fallback. Error:', errQ.message || errQ);
+                            project = null;
+                          }
                         } else {
                           console.log('Looking for repository projectV2 number', projectNumber, 'in', owner + '/' + repo);
                           const queryRepo = `query($owner:String!, $repo:String!, $number:Int!){ repository(owner:$owner, name:$repo){ projectV2(number:$number){ id title } } }`;
-                          const qres = await github.graphql(queryRepo, { owner, repo, number: projectNumber });
-                          project = qres && qres.repository && qres.repository.projectV2;
+                          try {
+                            const qres = await github.graphql(queryRepo, { owner, repo, number: projectNumber });
+                            project = qres && qres.repository && qres.repository.projectV2;
+                          } catch (errQ) {
+                            console.log('GraphQL query for repository projectV2 failed, continuing to fallback. Error:', errQ.message || errQ);
+                            project = null;
+                          }
                         }
 
-                        if (!project || !project.id) throw new Error('ProjectV2 not found for number ' + projectNumber + ' (scope=' + (process.env.PROJECT_SCOPE || 'repository') + ')');
+                        if (project && project.id) {
+                          console.log('Found project:', project.title, project.id);
 
-                        console.log('Found project:', project.title, project.id);
-
-                        // Try to add to ProjectV2 first
-                        try {
-                          const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
-                          const mres = await github.graphql(mutation, { projectId: project.id, contentId: contentNodeId });
-                          console.log('ProjectV2 item created:', mres);
+                          // Try to add to ProjectV2 first
+                          try {
+                            const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
+                            const mres = await github.graphql(mutation, { projectId: project.id, contentId: contentNodeId });
+                            console.log('ProjectV2 item created:', mres);
                           // Get the project item id
                           const projectItemId = mres && mres.addProjectV2ItemById && mres.addProjectV2ItemById.item && mres.addProjectV2ItemById.item.id;
 
@@ -130,7 +139,15 @@ jobs:
                         let classicProject = null;
                         try {
                           // Use REST API to list organization projects (requires permissions)
-                          const projectsList = await github.rest.projects.listForOrg({ org: owner, per_page: 100 });
+                          // If a PROJECT_TOKEN secret is provided, instantiate an Octokit with it to ensure permissions
+                          let projectsList;
+                          if (process.env.PROJECT_TOKEN) {
+                            const { Octokit } = require('@octokit/rest');
+                            const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
+                            projectsList = await oct.projects.listForOrg({ org: owner, per_page: 100 });
+                          } else {
+                            projectsList = await github.rest.projects.listForOrg({ org: owner, per_page: 100 });
+                          }
                           const found = (projectsList.data || []).find(p => {
                             try {
                               const urlParts = (p.html_url || '').split('/');
@@ -149,7 +166,14 @@ jobs:
 
                         console.log('Found classic project:', classicProject.name, classicProject.id, classicProject.html_url);
                         // List columns
-                        const colsRes = await github.rest.projects.listColumns({ project_id: classicProject.id });
+                        let colsRes;
+                        if (process.env.PROJECT_TOKEN) {
+                          const { Octokit } = require('@octokit/rest');
+                          const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
+                          colsRes = await oct.projects.listColumns({ project_id: classicProject.id });
+                        } else {
+                          colsRes = await github.rest.projects.listColumns({ project_id: classicProject.id });
+                        }
                         const cols = colsRes.data || [];
                         if (!cols.length) throw new Error('No columns found in classic project ' + classicProject.id);
                         // Prefer column named 'Backlog' (case-insensitive), otherwise fallback to first
@@ -164,13 +188,28 @@ jobs:
                         // Create card: if issue, link by content_id; if discussion, create note with link
                         if (context.payload.issue) {
                           const issueId = context.payload.issue.id; // numeric id
-                          const cardRes = await github.rest.projects.createCard({ column_id: column.id, content_id: issueId });
+                          if (process.env.PROJECT_TOKEN) {
+                            const { Octokit } = require('@octokit/rest');
+                            const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
+                            const cardRes = await oct.projects.createCard({ column_id: column.id, content_id: issueId });
+                            console.log('Created classic project card for issue:', cardRes.data.id);
+                          } else {
+                            const cardRes = await github.rest.projects.createCard({ column_id: column.id, content_id: issueId });
+                            console.log('Created classic project card for issue:', cardRes.data.id);
+                          }
                           console.log('Created classic project card for issue:', cardRes.data.id);
                         } else if (context.payload.discussion) {
                           const discussionUrl = context.payload.discussion.html_url;
                           const note = `Discussion: ${discussionUrl}`;
-                          const cardRes = await github.rest.projects.createCard({ column_id: column.id, note });
-                          console.log('Created classic project note card for discussion:', cardRes.data.id);
+                          if (process.env.PROJECT_TOKEN) {
+                            const { Octokit } = require('@octokit/rest');
+                            const oct = new Octokit({ auth: process.env.PROJECT_TOKEN });
+                            const cardRes = await oct.projects.createCard({ column_id: column.id, note });
+                            console.log('Created classic project note card for discussion:', cardRes.data.id);
+                          } else {
+                            const cardRes = await github.rest.projects.createCard({ column_id: column.id, note });
+                            console.log('Created classic project note card for discussion:', cardRes.data.id);
+                          }
                         } else {
                           throw new Error('No issue or discussion payload to create classic project card');
                         }
