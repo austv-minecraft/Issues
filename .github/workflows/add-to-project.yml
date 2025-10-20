@@ -8,7 +8,7 @@ on:
 # As permissões abaixo se aplicam ao GITHUB_TOKEN apenas e são mantidas mínimas.
 permissions:
   issues: read
-  contents: read
+  repository-projects: write
 
 jobs:
   add-to-project-backlog:
@@ -18,14 +18,12 @@ jobs:
         uses: actions/github-script@v6
         env:
           # Número e ID do Project v2
-          PROJECT_NUMBER: '21'
-          PROJECT_ID: 'PVT_kwDOCV9Tw84BF9Ag'
+          PROJECT_NUMBER: "21"
+          PROJECT_ID: "PVT_kwDOCV9Tw84BF9Ag"
           # PAT com permissões adequadas (project, repo, read:org)
           PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
         with:
           script: |
-            const core = require('@actions/core');
-
             // 1) Validar payload
             const issueNodeId = context.payload.issue?.node_id;
             if (!issueNodeId) {
