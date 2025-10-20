@@ -184,7 +184,28 @@ jobs:
 
                 // 6) Tentar setar o status "Backlog" (se existir como Single Select)
                 const fieldsRes = await gql(
-                  'query($projectId:ID!){ node(id:$projectId){ ... on ProjectV2 { fields(first:100){ nodes{ __typename id name ... on ProjectV2SingleSelectField { options { id name } } } } } } }',
+                  `query($projectId:ID!){ 
+                    node(id:$projectId){ 
+                      ... on ProjectV2 { 
+                        fields(first:100){ 
+                          nodes{ 
+                            ... on ProjectV2Field {
+                              id
+                              name
+                            }
+                            ... on ProjectV2SingleSelectField { 
+                              id
+                              name
+                              options { 
+                                id 
+                                name 
+                              } 
+                            } 
+                          } 
+                        } 
+                      } 
+                    } 
+                  }`,
                   { projectId }
                 );
                 const nodes = fieldsRes?.data?.node?.fields?.nodes || [];
