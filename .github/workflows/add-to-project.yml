@@ -68,10 +68,112 @@ jobs:
 
                         console.log('Found project:', project.title, project.id);
 
-                        // Add the issue/discussion to the project
-                        const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
-                        const mres = await github.graphql(mutation, { projectId: project.id, contentId: contentNodeId });
-                        console.log('Project item created:', mres);
+                        // Try to add to ProjectV2 first
+                        try {
+                          const mutation = `mutation($projectId:ID!, $contentId:ID!){ addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } } }`;
+                          const mres = await github.graphql(mutation, { projectId: project.id, contentId: contentNodeId });
+                          console.log('ProjectV2 item created:', mres);
+                          // Get the project item id
+                          const projectItemId = mres && mres.addProjectV2ItemById && mres.addProjectV2ItemById.item && mres.addProjectV2ItemById.item.id;
+
+                          if (projectItemId) {
+                            console.log('Project item id:', projectItemId);
+                            // Query project's fields and options to find the single-select option named 'Backlog'
+                            const fieldsQuery = `query($projectId:ID!){ node(id:$projectId){ ... on ProjectV2 { fields(first:100){ nodes{ __typename id name ... on ProjectV2SingleSelectField{ options{ id name } } } } } }`;
+                            const fq = await github.graphql(fieldsQuery, { projectId: project.id });
+                            const nodes = fq && fq.node && fq.node.fields && fq.node.fields.nodes ? fq.node.fields.nodes : [];
+                            let targetFieldId = null;
+                            let targetOptionId = null;
+                            for (const f of nodes) {
+                              if (f.__typename === 'ProjectV2SingleSelectField' && f.options && Array.isArray(f.options)) {
+                                for (const opt of f.options) {
+                                  if (opt.name && opt.name.toLowerCase() === 'backlog') {
+                                    targetFieldId = f.id;
+                                    targetOptionId = opt.id;
+                                    break;
+                                  }
+                                }
+                                if (targetFieldId) break;
+                              } else if (f.__typename && f.name && f.name.toLowerCase().includes('status')) {
+                                // as fallback, if field name contains 'status', check its options if available
+                                if (f.options && Array.isArray(f.options)) {
+                                  for (const opt of f.options) {
+                                    if (opt.name && opt.name.toLowerCase() === 'backlog') {
+                                      targetFieldId = f.id;
+                                      targetOptionId = opt.id;
+                                      break;
+                                    }
+                                  }
+                                  if (targetFieldId) break;
+                                }
+                              }
+                            }
+
+                            if (targetFieldId && targetOptionId) {
+                              console.log('Setting project field', targetFieldId, 'to option', targetOptionId, 'for item', projectItemId);
+                              const setMutation = `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:ID!){ updateProjectV2ItemFieldValue(input:{projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{singleSelectOptionId:$optionId}}){ projectV2Item{ id } } }`;
+                              const setRes = await github.graphql(setMutation, { projectId: project.id, itemId: projectItemId, fieldId: targetFieldId, optionId: targetOptionId });
+                              console.log('Set field result:', setRes);
+                            } else {
+                              console.log('Could not find a single-select field option named Backlog in project; item will be added to default location.');
+                            }
+                          }
+
+                          return;
+                        } catch (errV2) {
+                          console.log('ProjectV2 add failed or not supported, falling back to Classic Projects. Error:', errV2.message || errV2);
+                        }
+
+                        // Fallback: Projects Classic (REST API)
+                        console.log('Attempting Projects Classic fallback...');
+                        // Find classic project by HTML URL number (list org projects)
+                        let classicProject = null;
+                        try {
+                          // Use REST API to list organization projects (requires permissions)
+                          const projectsList = await github.rest.projects.listForOrg({ org: owner, per_page: 100 });
+                          const found = (projectsList.data || []).find(p => {
+                            try {
+                              const urlParts = (p.html_url || '').split('/');
+                              const num = parseInt(urlParts[urlParts.length - 1], 10);
+                              return num === projectNumber;
+                            } catch (e) { return false; }
+                          });
+                          classicProject = found || null;
+                        } catch (errList) {
+                          console.log('Error listing organization projects:', errList.message || errList);
+                        }
+
+                        if (!classicProject) {
+                          throw new Error('Could not find classic project with number ' + projectNumber + ' in organization ' + owner);
+                        }
+
+                        console.log('Found classic project:', classicProject.name, classicProject.id, classicProject.html_url);
+                        // List columns
+                        const colsRes = await github.rest.projects.listColumns({ project_id: classicProject.id });
+                        const cols = colsRes.data || [];
+                        if (!cols.length) throw new Error('No columns found in classic project ' + classicProject.id);
+                        // Prefer column named 'Backlog' (case-insensitive), otherwise fallback to first
+                        let column = cols.find(c => c.name && c.name.toLowerCase() === 'backlog');
+                        if (!column) {
+                          column = cols[0];
+                          console.log('Backlog column not found; falling back to first column:', column.name);
+                        } else {
+                          console.log('Found Backlog column:', column.name, column.id);
+                        }
+
+                        // Create card: if issue, link by content_id; if discussion, create note with link
+                        if (context.payload.issue) {
+                          const issueId = context.payload.issue.id; // numeric id
+                          const cardRes = await github.rest.projects.createCard({ column_id: column.id, content_id: issueId });
+                          console.log('Created classic project card for issue:', cardRes.data.id);
+                        } else if (context.payload.discussion) {
+                          const discussionUrl = context.payload.discussion.html_url;
+                          const note = `Discussion: ${discussionUrl}`;
+                          const cardRes = await github.rest.projects.createCard({ column_id: column.id, note });
+                          console.log('Created classic project note card for discussion:', cardRes.data.id);
+                        } else {
+                          throw new Error('No issue or discussion payload to create classic project card');
+                        }
                       } catch (err) {
                         console.log('Error adding to project:', err.message || err);
                         throw err;
