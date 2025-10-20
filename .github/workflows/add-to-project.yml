@@ -29,7 +29,8 @@ jobs:
           # Dono do projeto (org ou user) - sobrescreve o owner detectado do repositório
           PROJECT_OWNER: "austv-minecraft"
           # PAT com permissões adequadas (project, repo, read:org)
-          PROJECT_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          # Tente múltiplos nomes de secret como fallback
+          PROJECT_TOKEN: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
         with:
           script: |
             // 1) Validar payload
