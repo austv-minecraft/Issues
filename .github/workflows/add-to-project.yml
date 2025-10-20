@@ -47,14 +47,27 @@ jobs:
             }
             console.log('PROJECT_TOKEN present: true');
             console.log('Token length:', token.length);
+            console.log('Token prefix:', token.substring(0, 7) + '...');
+            console.log('Token suffix:', '...' + token.substring(token.length - 4));
 
             // 2.1) Diagnóstico: identidade do PAT via GraphQL
             try {
               const viewerRes = await github.request('POST /graphql', {
                 headers: { authorization: `token ${token}` },
-                data: JSON.stringify({ query: 'query { viewer { login } }' })
+                data: JSON.stringify({ query: 'query { viewer { login id } }' })
               });
-              console.log('PAT viewer.login:', viewerRes?.data?.data?.viewer?.login || 'unknown');
+              const viewer = viewerRes?.data?.data?.viewer;
+              console.log('PAT viewer.login:', viewer?.login || 'unknown');
+              console.log('PAT viewer.id:', viewer?.id || 'unknown');
+              
+              if (viewer?.login === 'github-actions[bot]') {
+                console.log('⚠️ WARNING: Using GITHUB_TOKEN instead of PROJECT_TOKEN!');
+                console.log('This means the PROJECT_TOKEN secret is not being read correctly.');
+                console.log('Possible causes:');
+                console.log('1. Secret not saved in repository settings');
+                console.log('2. Organization-level secret overriding repository secret');
+                console.log('3. Secret name mismatch (check spelling)');
+              }
             } catch (e) {
               console.log('Warning: viewer query failed:', e.message);
             }
