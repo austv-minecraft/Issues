@@ -39,6 +39,19 @@ jobs:
               return;
             }
 
+            // 2.1) Diagnóstico: identidade do PAT e escopos OAuth
+            try {
+              const who = await github.request('GET /user', {
+                headers: { authorization: `bearer ${process.env.PROJECT_TOKEN}` }
+              });
+              const viewerLogin = who?.data?.login;
+              const scopes = who?.headers?.['x-oauth-scopes'] || who?.headers?.['X-OAuth-Scopes'];
+              console.log(`PAT viewer.login: ${viewerLogin || 'unknown'}`);
+              console.log(`PAT OAuth scopes: ${scopes || 'unknown'}`);
+            } catch (e) {
+              console.log('Warning: could not query /user with PAT for diagnostics:', e.message || e);
+            }
+
             // 3) Preparar GraphQL usando o PAT
             async function gql(query, variables) {
               const res = await github.request({
@@ -59,7 +72,7 @@ jobs:
             }
 
             // 4) Resolver ProjectV2 por ID (fornecido)
-            const projectId = process.env.PROJECT_ID;
+            let projectId = process.env.PROJECT_ID;
             if (!projectId) {
               core.setFailed('PROJECT_ID not provided.');
               return;
@@ -67,14 +80,41 @@ jobs:
 
             (async () => {
               try {
-                // Preflight: projeto existe e é ProjectV2?
-                const projCheck = await gql(
-                  'query($id:ID!){ node(id:$id){ __typename ... on ProjectV2 { id title } } }',
-                  { id: projectId }
-                );
-                const projNode = projCheck?.data?.node;
-                if (!projNode || projNode.__typename !== 'ProjectV2') {
-                  throw new Error(`PROJECT_ID did not resolve to ProjectV2. Got: ${projNode?.__typename || 'null'}`);
+                // Preflight: projeto existe e é ProjectV2? Se não, tentar fallback por owner + number
+                let projNode;
+                try {
+                  const projCheck = await gql(
+                    'query($id:ID!){ node(id:$id){ __typename ... on ProjectV2 { id title } } }',
+                    { id: projectId }
+                  );
+                  projNode = projCheck?.data?.node;
+                  if (!projNode || projNode.__typename !== 'ProjectV2') {
+                    throw new Error(`PROJECT_ID did not resolve to ProjectV2. Got: ${projNode?.__typename || 'null'}`);
+                  }
+                } catch (preErr) {
+                  console.log(`Preflight by id failed: ${preErr.message || preErr}`);
+                  // Fallback: tentar resolver pelo owner do repositório + PROJECT_NUMBER
+                  const owner = context.payload.repository?.owner?.login || context.repo.owner;
+                  const number = parseInt(process.env.PROJECT_NUMBER || '0', 10);
+                  if (!owner || !Number.isInteger(number) || number <= 0) {
+                    throw new Error('Fallback requires valid owner and PROJECT_NUMBER.');
+                  }
+                  console.log(`Trying fallback lookup: owner=${owner}, number=${number}`);
+                  const fb = await gql(
+                    'query($owner:String!,$number:Int!){\n                      organization(login:$owner){ projectV2(number:$number){ id title } }\n                      user(login:$owner){ projectV2(number:$number){ id title } }\n                    }',
+                    { owner, number }
+                  );
+                  const orgProj = fb?.data?.organization?.projectV2;
+                  const userProj = fb?.data?.user?.projectV2;
+                  const found = orgProj || userProj;
+                  if (!found) {
+                    throw new Error(`Could not resolve ProjectV2 by owner+number. Check if project #${number} exists under ${owner}, is Project v2 (not Classic), and PAT has access (org membership + SSO + added to project).`);
+                  }
+                  projNode = { __typename: 'ProjectV2', id: found.id, title: found.title };
+                  if (projectId !== found.id) {
+                    console.log(`Notice: discovered project id differs from provided PROJECT_ID. Using discovered id: ${found.id}`);
+                    projectId = found.id;
+                  }
                 }
                 console.log('Target ProjectV2:', projNode.title, `(#${process.env.PROJECT_NUMBER})`, projectId);
 
@@ -124,6 +164,6 @@ jobs:
 
                 console.log('Success: Issue added to ProjectV2 (and Backlog if available).');
               } catch (e) {
-                core.setFailed(`Failed to add issue to ProjectV2: ${e.message || e}`);
+                core.setFailed(`Failed to add issue to ProjectV2: ${e.message || e}. If this mentions not resolving the project: ensure the PAT user is a member of the org, has SSO authorized, and has at least Write access to the target Project v2. Also confirm the project is Project v2 and PROJECT_NUMBER/ID are correct.`);
               }
             })();
