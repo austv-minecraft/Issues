@@ -249,10 +249,17 @@ jobs:
 
                 if (targetFieldId && targetOptionId) {
                   console.log(`Setting status to Backlog (field: ${targetFieldId}, option: ${targetOptionId})`);
-                  const setRes = await gql(
-                    'mutation($projectId:ID!,$itemId:ID!,$fieldId:ID!,$optionId:ID!){ updateProjectV2ItemFieldValue(input:{projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{singleSelectOptionId:$optionId}}){ projectV2Item{ id } } }',
-                    { projectId, itemId, fieldId: targetFieldId, optionId: targetOptionId }
-                  );
+                  // Some GraphQL endpoints treat variable types strictly. To avoid a variable type
+                  // mismatch between String and ID!, pass the option id inline as a string literal.
+                  const setMutation = `mutation($projectId:ID!,$itemId:ID!,$fieldId:ID!){
+                    updateProjectV2ItemFieldValue(input:{
+                      projectId:$projectId,
+                      itemId:$itemId,
+                      fieldId:$fieldId,
+                      value:{ singleSelectOptionId: \"${targetOptionId}\" }
+                    }){ projectV2Item{ id } }
+                  }`;
+                  const setRes = await gql(setMutation, { projectId, itemId, fieldId: targetFieldId });
                   console.log('Backlog status set successfully:', JSON.stringify(setRes));
                 } else {
                   console.log('⚠️ Backlog option not found in any status field.');
