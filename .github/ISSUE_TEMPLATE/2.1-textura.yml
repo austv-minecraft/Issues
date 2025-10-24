@@ -1,0 +1,164 @@
+name: Textura/Asset
+description: Solicitar criação ou modificação de texturas, modelos ou assets visuais
+labels: ["textura", "asset"]
+type: "Tarefa"
+assignees: ["andretxt"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use este template para solicitar criação ou modificação de texturas, modelos 3D, sons ou outros assets visuais.
+
+  - type: dropdown
+    id: tipo_asset
+    attributes:
+      label: Tipo de asset
+      description: Qual tipo de recurso você está solicitando?
+      options:
+        - Textura de item
+        - Textura de bloco
+        - Modelo 3D customizado
+        - Skin de mob
+        - GUI/Interface
+        - Ícone
+        - Som/Música
+        - Partículas/Efeitos
+        - Outro
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor destinado
+      description: Para qual servidor este asset será utilizado?
+      options:
+        - Não especificado (qualquer)
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - AusDungeon
+        - Discord
+        - Sites ou externos
+        - Todos os servidores
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: nome_item
+    attributes:
+      label: Nome do item/bloco/asset
+      description: Qual o nome do item, bloco ou asset que precisa da textura?
+      placeholder: "Ex: Espada Flamejante, Bloco de Cristal, Menu de Clãs"
+    validations:
+      required: true
+
+  - type: textarea
+    id: funcao
+    attributes:
+      label: Função/Uso do item
+      description: Para que serve este item? Como ele será usado no servidor?
+      placeholder: |
+        Ex: Espada especial que causa dano de fogo, obtida através de crafting no servidor Henesys
+        Ex: Bloco decorativo para construção, vendido na loja do spawn
+        Ex: Interface do menu de clãs, acionada pelo comando /clan
+    validations:
+      required: true
+
+  - type: textarea
+    id: paleta_cores
+    attributes:
+      label: Paleta de cores sugerida
+      description: Quais cores devem predominar? Tem alguma paleta específica em mente?
+      placeholder: |
+        Ex: #00ED7F
+        Ex: #00CB8A
+        Ex: #008166
+    validations:
+      required: false
+
+  - type: dropdown
+    id: estilo
+    attributes:
+      label: Estilo visual desejado
+      description: Qual estilo visual este asset deve seguir?
+      options:
+        - Padrão Minecraft (16x16 pixel art)
+        - Medieval/Fantasia
+        - Futurista/Tecnológico
+        - Realista/Detalhado
+        - Minimalista/Simples
+        - Cartoonesco/Colorido
+        - Sombrio/Terror
+        - Seguir estilo do servidor
+        - Outro
+      default: 0
+    validations:
+      required: false
+
+  - type: textarea
+    id: descricao_visual
+    attributes:
+      label: Descrição visual detalhada
+      description: Descreva com o máximo de detalhes possível como deve ser o visual
+      placeholder: |
+        Ex: Uma espada com lâmina vermelha brilhante, cabo dourado com detalhes em rubis, 
+        partículas de fogo saindo da lâmina. Estilo medieval fantasia.
+
+        Ex: Bloco transparente com cristais internos em formato de X, 
+        reflexos azuis, textura lisa e brilhante como vidro.
+    validations:
+      required: true
+
+  - type: textarea
+    id: referencias
+    attributes:
+      label: Referências visuais
+      description: |
+        Anexe links, imagens ou referências que sirvam de inspiração
+        Pode ser de outros jogos, mods, resource packs, ou arte conceitual
+      placeholder: |
+        Ex: Similar à Netherite Sword mas com partículas de fogo
+        Ex: https://i.imgur.com/exemplo.png
+        Ex: Inspirado no mod Tinkers' Construct
+    validations:
+      required: false
+
+  - type: textarea
+    id: especificacoes_tecnicas
+    attributes:
+      label: Especificações técnicas (se souber)
+      description: |
+        Informações técnicas sobre o asset (resolução, formato, custom model data, etc.)
+      placeholder: |
+        Ex: Textura 16x16 pixels
+        Ex: Custom Model Data ID: 1001
+        Ex: Precisa ter variantes (quebrado, meio usado, novo)
+        Ex: Arquivo .png com transparência
+    validations:
+      required: false
+
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Prioridade
+      description: Qual a urgência desta solicitação?
+      options:
+        - ⚪ Não especificado
+        - 🟢 Baixa
+        - 🟡 Média
+        - 🟠 Alta
+        - 🔴 Urgência total
+      default: 0
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        **Dica:** Quanto mais detalhes e referências você fornecer, mais fácil será criar exatamente o que você imaginou! 🎨
+        Se possível, faça um desenho ou sketch básico e anexe como referência.
