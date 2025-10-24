@@ -1,0 +1,201 @@
+name: Feature Request
+description: Solicitar uma nova funcionalidade ou recurso
+labels: ["New"]
+type: "Feature"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use este template para solicitar novas funcionalidades, recursos ou sistemas para os servidores.
+
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor destinado
+      description: Para qual servidor esta funcionalidade será implementada?
+      options:
+        - Não especificado (qualquer)
+        - Todos os servidores
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - AusDungeon
+        - Discord (bot)
+        - Sites ou externos
+        - Redes sociais
+        - Um novo servidor
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: titulo_feature
+    attributes:
+      label: Nome/Título da funcionalidade
+      description: Dê um nome curto e objetivo para a feature
+      placeholder: "Ex: Sistema de Clãs, Missões Diárias, Shop de Cosméticos"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qual problema esta feature resolve?
+      description: |
+        Explique qual necessidade ou problema dos jogadores esta funcionalidade vai resolver.
+        Por que esta feature é importante?
+      placeholder: |
+        Ex: Atualmente não há forma dos jogadores se organizarem em grupos permanentes, 
+        dificultando a coordenação de atividades em equipe e criando menos senso de comunidade.
+    validations:
+      required: true
+
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição detalhada da funcionalidade
+      description: |
+        Descreva em detalhes como a funcionalidade deve funcionar.
+        O que ela faz? Como os jogadores vão interagir com ela?
+      placeholder: |
+        Ex: Sistema de Clãs onde jogadores podem:
+        - Criar clãs com /clan create <nome>
+        - Convidar membros com /clan invite <jogador>
+        - Ter chat exclusivo do clã com /clan chat
+        - Ver lista de membros com /clan members
+        - Ter base/território exclusivo do clã
+        - Ranking de clãs baseado em conquistas
+    validations:
+      required: true
+
+  - type: textarea
+    id: casos_uso
+    attributes:
+      label: Casos de uso / Exemplos práticos
+      description: Dê exemplos concretos de como os jogadores usariam esta feature
+      placeholder: |
+        Ex: Um grupo de 5 amigos cria o clã "Os Aventureiros":
+        1. Líder usa /clan create Os Aventureiros
+        2. Convida os amigos que aceitam o convite
+        3. Todos usam o chat do clã para combinar eventos
+        4. Constroem uma base compartilhada na área de território do clã
+        5. Completam missões juntos para subir no ranking de clãs
+    validations:
+      required: false
+
+  - type: dropdown
+    id: categoria
+    attributes:
+      label: Categoria da funcionalidade
+      description: Qual tipo de feature você está solicitando?
+      options:
+        - Social/Comunidade
+        - Economia/Shop
+        - Gameplay/Mecânicas
+        - PvP/Combate
+        - PvE/Mobs
+        - Construção/Building
+        - Progressão/Ranking
+        - Customização/Cosméticos
+        - Administração/Moderação
+        - Interface/UX
+        - Integração externa
+        - Outro
+      default: 0
+    validations:
+      required: false
+
+  - type: textarea
+    id: beneficios
+    attributes:
+      label: Benefícios esperados
+      description: |
+        Quais os benefícios desta feature para os jogadores e para o servidor?
+        Como isso melhora a experiência?
+      placeholder: |
+        Ex: 
+        - Aumenta engajamento e retenção de jogadores
+        - Cria senso de comunidade e pertencimento
+        - Incentiva trabalho em equipe
+        - Adiciona novo objetivo de longo prazo
+        - Diferencia o servidor da concorrência
+    validations:
+      required: false
+
+  - type: textarea
+    id: implementacao_sugerida
+    attributes:
+      label: Sugestão de implementação (opcional)
+      description: |
+        Se você tem ideias de como implementar tecnicamente, compartilhe aqui.
+        Plugins similares, comandos, mecânicas, etc.
+      placeholder: |
+        Ex: Usar plugin "Guilds" como base, mas customizar para ter sistema de território
+        Ex: Integrar com sistema de ranks já existente
+        Ex: Similar ao sistema de clãs do servidor X
+    validations:
+      required: false
+
+  - type: textarea
+    id: referencias
+    attributes:
+      label: Referências / Inspirações
+      description: |
+        Outros servidores, jogos ou sistemas que inspiraram esta ideia?
+        Links, vídeos, prints de exemplo
+      placeholder: |
+        Ex: Similar ao sistema de Guilds do Wynncraft
+        Ex: https://www.youtube.com/exemplo
+        Ex: Inspirado no sistema de Clãs do Clash of Clans
+    validations:
+      required: false
+
+  - type: dropdown
+    id: complexidade
+    attributes:
+      label: Complexidade estimada
+      description: |
+        Na sua opinião, quão complexa seria a implementação desta feature?
+        (Isso ajuda no planejamento, mas será reavaliado pela equipe)
+      options:
+        - Não sei estimar
+        - 🟢 Baixa - Simples/Rápida
+        - 🟡 Média - Requer algum trabalho
+        - 🟠 Alta - Complexa e demorada
+        - 🔴 Muito alta - Projeto grande
+      default: 0
+    validations:
+      required: false
+
+  - type: dropdown
+    id: impacto
+    attributes:
+      label: Impacto esperado
+      description: |
+        Qual seria o impacto desta feature no servidor?
+        Quantos jogadores seriam afetados/beneficiados?
+      options:
+        - 🟢 Baixo - Nicho específico
+        - 🟡 Médio - Parte da comunidade
+        - 🟠 Alto - Maioria dos jogadores
+        - 🔴 Crítico - Todos os jogadores
+      default: 0
+    validations:
+      required: false
+
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Prioridade sugerida
+      description: Na sua opinião, qual a urgência/prioridade desta feature?
+      options:
+        - ⚪ Não especificado
+        - 🟢 Baixa - Seria legal ter
+        - 🟡 Média - Importante mas não urgente
+        - 🟠 Alta - Muito desejada
+        - 🔴 Crítica - Essencial/Urgente
+      default: 0
+    validations:
+      required: false
