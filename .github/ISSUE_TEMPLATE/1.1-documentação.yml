@@ -1,0 +1,123 @@
+name: Documentação
+description: Reportar problemas na wiki ou solicitar nova documentação
+labels: ["documentação"]
+type: "Documentação"
+assignees: ["DarknessBH"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use este template para reportar erros na wiki ou solicitar criação/atualização de documentação.
+
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: Tipo de solicitação
+      description: O que você precisa em relação à documentação?
+      options:
+        - Erro/Informação incorreta na wiki
+        - Informação desatualizada
+        - Informação faltando/incompleta
+        - Solicitar nova categoria/página
+        - Melhorar clareza/formatação
+        - Adicionar exemplos/tutoriais
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor/Área relacionada
+      description: A qual servidor ou área esta documentação se refere?
+      options:
+        - Geral (todos os servidores)
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - AusDungeon
+        - Discord
+        - Sites ou externos
+        - Redes sociais
+        - Regras e políticas
+        - Tutoriais gerais
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: pagina
+    attributes:
+      label: Página da wiki (se aplicável)
+      description: Cole o link ou nome da página da wiki com problema
+      placeholder: "Ex: https://wiki.austv.com.br/objetivos ou 'Página de Objetivos'"
+    validations:
+      required: false
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Descrição do problema ou solicitação
+      description: |
+        - Se for um erro: explique qual informação está incorreta
+        - Se for uma solicitação: descreva o que precisa ser documentado
+      placeholder: |
+        Ex: A wiki diz que precisa de 10 itens, mas na verdade precisa de 15
+        Ex: Não existe documentação sobre como usar o sistema de clãs
+    validations:
+      required: true
+
+  - type: textarea
+    id: localizacao
+    attributes:
+      label: Localização específica (se aplicável)
+      description: Em qual seção/parágrafo da página está o problema?
+      placeholder: "Ex: Na seção 'Como completar', terceiro parágrafo"
+    validations:
+      required: false
+
+  - type: textarea
+    id: conteudo_correto
+    attributes:
+      label: Conteúdo correto ou sugestão
+      description: |
+        - Para erros: qual deveria ser a informação correta?
+        - Para solicitações: sugira o conteúdo ou estrutura desejada
+      placeholder: |
+        Ex: O correto é: "Você precisa coletar 15 itens..."
+        Ex: A nova categoria deveria conter: introdução, comandos básicos, exemplos práticos...
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Evidências/Prints
+      description: Anexe prints da wiki, do jogo, ou outros recursos que comprovem o erro ou ajudem a entender a solicitação
+    validations:
+      required: false
+
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Prioridade
+      description: |
+        Qual a urgência desta correção/adição?
+        Alta: informação crítica incorreta ou muito procurada
+        Média: informação útil mas não urgente
+        Baixa: melhorias de formatação ou detalhes menores
+      options:
+        - ⚪ Não especificado
+        - 🟢 Baixa
+        - 🟡 Média
+        - 🟠 Alta
+      default: 0
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        **Dica:** Seja específico! Quanto mais detalhes você fornecer, mais fácil será corrigir ou criar a documentação.
