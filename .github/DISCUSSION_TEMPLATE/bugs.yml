@@ -3,60 +3,58 @@ body:
   - type: markdown
     attributes:
       value: |
-        Obrigado por reportar um bug! Para nos ajudar a reproduzir e consertar mais rápido, preencha os campos abaixo com o máximo de detalhes possível.
-  - type: input
-    id: resumo
-    attributes:
-      label: Resumo do bug
-      description: Um título curto e objetivo do problema.
-      placeholder: Ex. Jogador não recebe XP ao derrotar monstros
-    validations:
-      required: true
-  - type: input
-    id: ambiente
-    attributes:
-      label: Ambiente / Versão
-      description: Informe versão do server/cliente, plugins, plataforma, etc.
-    validations:
-      required: false
-  - type: textarea
-    id: passos
-    attributes:
-      label: Passos para reproduzir
-      description: Liste passos numerados para que possamos reproduzir o bug.
-    validations:
-      required: true
-  - type: textarea
-    id: comportamento_esperado
-    attributes:
-      label: Comportamento esperado
-      description: O que deveria acontecer em condições normais.
-    validations:
-      required: true
-  - type: textarea
-    id: comportamento_atual
-    attributes:
-      label: Comportamento atual
-      description: O que acontece na prática quando o bug ocorre.
-    validations:
-      required: true
-  - type: textarea
-    id: evidencias
-    attributes:
-      label: Logs / Prints / Anexos
-      description: Cole logs, prints ou links que ajudem a diagnosticar.
-    validations:
-      required: false
+        Confira em responder todos os campos corretamente.
   - type: dropdown
-    id: severidade
+    id: servidor
     attributes:
-      label: Severidade
-      description: Como este bug impacta o uso do projeto?
+      label: Servidor referido
+      description: Este bug está em qual servidor?
       options:
-        - Baixa
-        - Média
-        - Alta
-        - Crítica
-      default: 1
+        - Não especificado (qualquer)
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - Discord
+        - Sites ou externos
+        - Redes sociais
+        - Um novo servidor
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Descrição do bug
+      description: Descreva o que ocorreu de forma equivocada.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reprodução
+      description: |
+        Descreva detalhamente como reproduzir o bug. Se alguém que denunciou,
+        pergunte-o ou peça prints do bug e envie aqui.
+    validations:
+      required: true
+  - type: dropdown
+    id: prioridade
+    attributes:
+      label: Gravidade
+      description: |
+        Defina uma gravidade para esse bug caso ele de fato esteja afetando
+        algo muito crítico no servidor ou causando um certo incômodo. Caso contrário,
+        não selecione nenhuma opção
+      options:
+        - ⚪ Não especificado
+        - 🟢 Baixa
+        - 🟡 Média
+        - 🟠 Alta
+        - 🔴 Urgência total
+      default: 0
     validations:
       required: false
+  - type: markdown
+    attributes:
+      value: |
+        **Atenção:** Selecione as tags referentes a qual servidor. Caso necessário, altere o responsável por corrigir o bug. Se o bug ainda não foi confirmado, altere o tag para bug não confirmado.
