@@ -1,0 +1,164 @@
+name: Performance/Lag
+description: Reportar problemas de lag, travamentos ou baixa performance
+labels: ["performance"]
+type: "Performance"
+assignees: ["ZzPowerTechzZ"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use este template para reportar problemas de lag, FPS baixo, travamentos ou lentidão nos servidores.
+
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor afetado
+      description: Em qual servidor você está tendo problemas de performance?
+      options:
+        - Não especificado (qualquer)
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - AusDungeon
+        - Discord (bot lento)
+        - Sites ou externos
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tipo_problema
+    attributes:
+      label: Tipo de problema
+      description: Qual tipo de problema de performance você está enfrentando?
+      options:
+        - Lag/Atraso geral
+        - Queda de FPS
+        - Travamento/Freeze
+        - Demora para carregar
+        - Desconexão/Kick por timeout
+        - TPS baixo do servidor
+        - Comando demorado
+        - Outro
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição do problema
+      description: Descreva detalhadamente o problema de performance que você está enfrentando
+      placeholder: |
+        Ex: Quando entro na área de farm, o jogo começa a travar e o FPS cai de 60 para 15
+        Ex: O comando /shop demora mais de 5 segundos para abrir
+    validations:
+      required: true
+
+  - type: textarea
+    id: quando_ocorre
+    attributes:
+      label: Quando ocorre?
+      description: O problema acontece sempre ou em situações específicas?
+      placeholder: |
+        Ex: Acontece sempre que há mais de 20 jogadores online
+        Ex: Só ocorre na região de spawn, coordenadas X:100 Z:200
+        Ex: Começou após a última atualização do servidor
+    validations:
+      required: true
+
+  - type: input
+    id: jogadores_online
+    attributes:
+      label: Número de jogadores online (aproximado)
+      description: Quantos jogadores estavam online quando o problema ocorreu?
+      placeholder: "Ex: 25 jogadores"
+    validations:
+      required: false
+
+  - type: input
+    id: localizacao
+    attributes:
+      label: Local/Coordenadas (se aplicável)
+      description: Se o problema ocorre em um local específico, informe as coordenadas ou descrição
+      placeholder: "Ex: X:1500 Y:64 Z:-2300 ou 'Área de farm de mobs'"
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproducao
+    attributes:
+      label: Como reproduzir
+      description: Liste os passos para reproduzir o problema de performance
+      placeholder: |
+        1. Entre no servidor Henesys
+        2. Vá para a área de farm (coordenadas X:100 Z:200)
+        3. Aguarde 2-3 minutos
+        4. O lag/travamento começa a acontecer
+    validations:
+      required: true
+
+  - type: textarea
+    id: especificacoes
+    attributes:
+      label: Suas especificações (opcional mas recomendado)
+      description: |
+        Informe suas especificações de PC/conexão para ajudar a diagnosticar se é problema do servidor ou cliente
+      placeholder: |
+        - PC: Windows 11, 16GB RAM, RTX 3060
+        - Minecraft: Versão 1.20.1
+        - Mods/Optifine: Optifine instalado
+        - Internet: 100mbps
+        - Ping médio: 50ms
+    validations:
+      required: false
+
+  - type: textarea
+    id: prints_videos
+    attributes:
+      label: Evidências (prints, vídeos, F3)
+      description: |
+        Anexe prints da tela F3 mostrando FPS/TPS, vídeos do problema, ou logs
+        Print do F3 é muito útil para diagnosticar!
+    validations:
+      required: false
+
+  - type: dropdown
+    id: outros_afetados
+    attributes:
+      label: Outros jogadores também estão afetados?
+      description: O problema afeta só você ou outros jogadores também reclamaram?
+      options:
+        - Não sei
+        - Sim, outros jogadores também
+        - Não, parece ser só comigo
+      default: 0
+    validations:
+      required: false
+
+  - type: dropdown
+    id: gravidade
+    attributes:
+      label: Gravidade
+      description: |
+        Qual o impacto deste problema de performance?
+        Alta: Impossibilita jogar
+        Média: Atrapalha mas dá para jogar
+        Baixa: Incômodo leve
+      options:
+        - ⚪ Não especificado
+        - 🟢 Baixa
+        - 🟡 Média
+        - 🟠 Alta
+        - 🔴 Urgência total
+      default: 0
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        **Dica:** Prints da tela F3 do Minecraft são muito úteis para diagnosticar problemas de performance! 
+        Mostre o FPS, TPS do servidor e uso de memória.
