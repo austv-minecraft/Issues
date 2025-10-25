@@ -2,7 +2,7 @@ name: Segurança/Exploit
 description: Reportar vulnerabilidades, exploits ou problemas de segurança (CONFIDENCIAL)
 labels: ["bugs: confirmado", "exploit"]
 type: "Segurança"
-assignees: ["ZzPowerTechzZ"]
+assignees: ["darkness"]
 body:
   - type: markdown
     attributes:
