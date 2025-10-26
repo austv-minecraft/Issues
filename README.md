@@ -4,7 +4,7 @@
 
   [![Tecnologias](https://skillicons.dev/icons?i=githubactions,github,bash,discord)](https://skillicons.dev)
 
-  ![GitHub contributors](https://img.shields.io/github/created-at/leogianfagna/IssueTracker) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues-closed/leogianfagna/IssueTracker)
+  ![GitHub contributors](https://img.shields.io/github/created-at/austv-minecraft/Issues) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues-closed/austv-minecraft/Issues)
 
 </div>
 
@@ -34,7 +34,7 @@ Como os issues são categorizados, automaticamente rotula os responsáveis para 
 Classifica os issues em 6 níveis de prioridade, com o objetivo de fazer que o mais crítico sempre seja resolvido primeiro. Isso foi uma solução imposta após uma comunidade de usuários reclamar da demora de resolver bugs que estavam estragando a experiência.
 
 ### 🗣️ Banco de ideias e melhorias
-A aba de [discussões](https://github.com/leogianfagna/IssueTracker/discussions) permite escrever [ideias](https://github.com/leogianfagna/IssueTracker/discussions/categories/ideia?discussions_q=) e [discutir melhorias](https://github.com/leogianfagna/IssueTracker/discussions/categories/opinioes?discussions_q=), criando um incrível banco com muitos dados importantes no desenvolvimento. Os Discussions do GitHub permite comentários organizados e nessa, também inclui prioridades nas ideias e níveis de relevância. Não vamos se preocupar com aquela ideia mais ou menos né?
+A aba de [discussões](https://github.com/austv-minecraft/Issues/discussions) permite escrever [ideias](https://github.com/austv-minecraft/Issues/discussions/categories/ideia?discussions_q=) e [discutir melhorias](https://github.com/austv-minecraft/Issues/discussions/categories/opinioes?discussions_q=), criando um incrível banco com muitos dados importantes no desenvolvimento. Os Discussions do GitHub permite comentários organizados e nessa, também inclui prioridades nas ideias e níveis de relevância. Não vamos se preocupar com aquela ideia mais ou menos né?
 
 ### 📣 Notificação do Discord
 Um script que notifica o desenvolvimento no Discord, sempre mantendo todos atualizados do que está acontecendo. Assim, ninguém abre aquele issue e some, e aquele que quer saber o que está rolando com o que foi reportado, vai receber em primeira mão. Para funcionar, você precisa criar uma secret com id `DISCORD_WEBHOOK_URL` incluindo o webhook de qualquer canal seu do Discord.
