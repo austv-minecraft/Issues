@@ -1,0 +1,120 @@
+labels: ["feedback", "staff"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por deixar um feedback! Use este espaço para postar opiniões, impressões e sugestões sobre atualizações, modificações, eventos ou qualquer mudança no servidor.
+
+        Este template é pensado para que ajudantes e membros da staff registrem feedbacks construtivos que ajudem na melhoria contínua.
+
+  - type: input
+    id: titulo
+    attributes:
+      label: Título do feedback
+      description: 'Escreva um título curto e objetivo para o feedback (ex: "Balanceamento da skill X - positivo").'
+      placeholder: "Ex: Feedback - Atualização de Economia"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: Tipo de atualização/modificação
+      description: Que tipo de alteração você está avaliando?
+      options:
+        - Atualização de sistema (plugin/comando)
+        - Mudança de balanceamento
+        - Nova funcionalidade
+        - Remoção/Deprecação
+        - Evento/Atividade
+        - Interface/UX
+        - Conteúdo visual (texturas/skins)
+        - Comunicação/Anúncio
+        - Outro
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: referencia
+    attributes:
+      label: Referência (PR/versão/link)
+      description: "Link para o PR, versão, nota de atualização ou mensagem relevante (se aplicável)."
+      placeholder: "Ex: Versão 1.4.2"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: servidor
+    attributes:
+      label: Servidor/Área afetada
+      description: Em qual servidor/área isso foi aplicado?
+      options:
+        - Geral (todos os servidores)
+        - Henesys
+        - Vanillew
+        - Skyten
+        - Lobby
+        - Ausevento
+        - AusDungeon
+        - Discord
+        - Sites ou externos
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: o_que_gostei
+    attributes:
+      label: O que você gostou?
+      description: Descreva os pontos positivos ou o que funcionou bem.
+      placeholder: |
+        Ex: A nova mecânica de quests aumentou a interação entre jogadores e é intuitiva.
+    validations:
+      required: true
+
+  - type: textarea
+    id: pontos_a_melhorar
+    attributes:
+      label: Pontos a melhorar
+      description: Liste problemas, comportamentos indesejados ou áreas que precisam de ajuste.
+      placeholder: |
+        Ex: Em áreas com muitos jogadores, o tempo de carregamento aumentou; sugerir otimização.
+    validations:
+      required: false
+
+  - type: textarea
+    id: sugestoes
+    attributes:
+      label: Sugestões concretas
+      description: Proponha soluções práticas ou alternativas para os pontos a melhorar.
+      placeholder: |
+        Ex: Reduzir spawn de mobs nessa área ou adicionar cooldown no evento X.
+    validations:
+      required: false
+
+  - type: textarea
+    id: impacto
+    attributes:
+      label: Impacto percebido
+      description: Como essa mudança impacta jogadores/fluxos (positiva ou negativamente)?
+      placeholder: |
+        Ex: Aumentou retenção em 2 horas durante o evento; porém, pode prejudicar jogadores com PC fraco.
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Evidências (prints, vídeos, logs)
+      description: "Anexe links ou descreva evidências que suportem seu feedback (prints, gravações, logs de erro)."
+      placeholder: "Ex: Print do chat, vídeo do bug, link para teste de desempenho"
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        **Dica para quem posta:** Seja claro e conciso. Feedbacks construtivos com sugestões práticas aumentam muito a chance de serem implementados.
+
+        Use este espaço para debate entre staff. Se o feedback gerar ações, crie uma issue vinculada com um link para essa discussão.
