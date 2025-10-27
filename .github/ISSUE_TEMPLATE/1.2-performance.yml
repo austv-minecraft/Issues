@@ -1,7 +1,7 @@
 name: Performance/Lag
 description: Reportar problemas de lag, travamentos ou baixa performance
 labels: ["performance"]
-type: "Performance"
+type: "Bug"
 assignees: ["ZzPowerTechzZ"]
 body:
   - type: markdown

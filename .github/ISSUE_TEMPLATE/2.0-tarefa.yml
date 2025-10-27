@@ -1,7 +1,7 @@
 name: Tarefa
 description: Lembrar de fazer algo
 # labels: ["tarefa", "→⚪"]
-type: 'Tarefa'
+type: 'Feature'
 assignees: ["ZzPowerTechzZ"]
 body:
   - type: textarea
