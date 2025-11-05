@@ -25,7 +25,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_REVIEW_TEST || secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_ROLE_ID: ${{ secrets.DISCORD_REVIEW_ROLE_ID || secrets.DISCORD_ROLE_ID }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
           script: |
             console.log('=== Iniciando verificação de issues em Review/Test ===\n');
 
