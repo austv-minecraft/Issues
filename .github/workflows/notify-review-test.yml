@@ -74,8 +74,22 @@ jobs:
               }
             }
 
-            // 4) Função para enviar notificação ao Discord usando exec
-            async function sendDiscordNotification(issue, status) {
+            // 4) Função para extrair owner e repo da URL da issue
+            function parseIssueUrl(url) {
+              // URL format: https://github.com/owner/repo/issues/123
+              const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)\/issues\/(\d+)/);
+              if (match) {
+                return {
+                  owner: match[1],
+                  repo: match[2],
+                  number: parseInt(match[3])
+                };
+              }
+              return null;
+            }
+
+            // 5) Função para enviar notificação ao Discord usando exec
+            async function sendDiscordNotification(issue, status, repoInfo) {
               const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
               if (!webhookUrl) {
                 console.log('⚠️ DISCORD_WEBHOOK_URL não configurado.');
@@ -94,6 +108,11 @@ jobs:
                   color: 65280,
                   fields: [
                     {
+                      name: 'Repositório',
+                      value: `${repoInfo.owner}/${repoInfo.repo}`,
+                      inline: true
+                    },
+                    {
                       name: 'Autor',
                       value: issue.author || 'Desconhecido',
                       inline: true
@@ -105,7 +124,7 @@ jobs:
                     }
                   ],
                   footer: {
-                    text: `${context.repo.owner}/${context.repo.repo}`
+                    text: `${repoInfo.owner}/${repoInfo.repo}`
                   },
                   timestamp: new Date().toISOString()
                 }]
@@ -123,7 +142,7 @@ jobs:
                   ignoreReturnCode: false
                 });
                 
-                console.log(`✅ Notificação enviada para Discord - Issue #${issue.number}`);
+                console.log(`✅ Notificação enviada para Discord - Issue #${issue.number} (${repoInfo.owner}/${repoInfo.repo})`);
                 return true;
               } catch (error) {
                 console.log(`❌ Erro ao enviar notificação para Discord - Issue #${issue.number}:`, error.message);
@@ -131,7 +150,7 @@ jobs:
               }
             }
 
-            // 5) Resolver ProjectV2 por ID
+            // 6) Resolver ProjectV2 por ID
             let projectId = process.env.PROJECT_ID;
             if (!projectId) {
               core.setFailed('PROJECT_ID not provided.');
@@ -194,7 +213,7 @@ jobs:
                 
                 console.log(`✓ Target Project: ${projNode.title} (#${projNode.number})`);
 
-                // 6) Buscar TODOS os itens do projeto
+                // 7) Buscar TODOS os itens do projeto
                 console.log('\n=== Buscando Issues no Projeto ===');
                 
                 const itemsQuery = `
@@ -217,6 +236,12 @@ jobs:
                                   nodes {
                                     name
                                   }
+                                }
+                                repository {
+                                  owner {
+                                    login
+                                  }
+                                  name
                                 }
                               }
                             }
@@ -246,9 +271,10 @@ jobs:
                 
                 console.log(`Total de itens no projeto: ${items.length}`);
                 
-                // 7) Processar cada item e verificar se está em Review/Test
+                // 8) Processar cada item e verificar se está em Review/Test
                 let issuesProcessed = 0;
                 let issuesNotified = 0;
+                let issuesDeleted = 0;
                 
                 for (const item of items) {
                   if (!item.content || !item.content.number) {
@@ -259,20 +285,45 @@ jobs:
                   const issue = item.content;
                   const issueNumber = issue.number;
                   
+                  // Extrair owner e repo da issue
+                  const repoInfo = issue.repository ? {
+                    owner: issue.repository.owner.login,
+                    repo: issue.repository.name,
+                    number: issueNumber
+                  } : parseIssueUrl(issue.url);
+                  
+                  if (!repoInfo) {
+                    console.log(`⚠️ Issue #${issueNumber} - Não foi possível extrair informações do repositório`);
+                    continue;
+                  }
+                  
+                  console.log(`\nProcessando Issue #${issueNumber} (${repoInfo.owner}/${repoInfo.repo})`);
+                  
                   // VERIFICAÇÃO DUPLA: Buscar labels diretamente da API para garantir dados atualizados
                   let issueLabels = [];
+                  let issueExists = true;
+                  
                   try {
                     const issueData = await github.rest.issues.get({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
+                      owner: repoInfo.owner,
+                      repo: repoInfo.repo,
                       issue_number: issueNumber
                     });
                     issueLabels = issueData.data.labels.map(l => l.name);
-                    console.log(`Issue #${issueNumber} - Labels atuais: [${issueLabels.join(', ')}]`);
                   } catch (e) {
-                    console.log(`⚠️ Erro ao buscar labels da issue #${issueNumber}:`, e.message);
+                    if (e.message.includes('Not Found') || e.message.includes('deleted')) {
+                      console.log(`  ⚠️ Issue deletada ou inacessível - pulando`);
+                      issueExists = false;
+                      issuesDeleted++;
+                      continue;
+                    }
+                    console.log(`  ⚠️ Erro ao buscar issue:`, e.message);
                     // Fallback para labels do GraphQL
                     issueLabels = (issue.labels?.nodes || []).map(l => l.name);
+                  }
+                  
+                  if (!issueExists) {
+                    continue; // Issue deletada, pular
                   }
                   
                   const fieldValues = item.fieldValues?.nodes || [];
@@ -306,30 +357,35 @@ jobs:
                   const alreadyNotified = issueLabels.includes('🔔 notificado-review');
                   
                   if (alreadyNotified) {
-                    console.log(`  Issue #${issueNumber} - Já notificada (pulando)`);
+                    console.log(`  ℹ️ Já notificada (pulando)`);
                     continue;
                   }
                   
                   // Issue em Review/Test e não notificada
-                  console.log(`\n🎯 Issue #${issueNumber} encontrada em Review/Test (não notificada)`);
-                  console.log(`   Título: ${issue.title}`);
-                  console.log(`   Status: ${currentStatus}`);
+                  console.log(`  🎯 Encontrada em Review/Test (não notificada)`);
+                  console.log(`     Título: ${issue.title}`);
+                  console.log(`     Status: ${currentStatus}`);
+                  console.log(`     Labels: [${issueLabels.join(', ')}]`);
                   
                   // ADICIONAR LABEL ANTES de enviar notificação (prevenir duplicatas)
                   try {
                     await github.rest.issues.addLabels({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
+                      owner: repoInfo.owner,
+                      repo: repoInfo.repo,
                       issue_number: issueNumber,
                       labels: ['🔔 notificado-review']
                     });
-                    console.log(`   ✓ Label "🔔 notificado-review" adicionada (PRÉ-ENVIO)`);
+                    console.log(`     ✓ Label adicionada (PRÉ-ENVIO)`);
                     
                     // Pequeno delay para garantir que a label foi adicionada
                     await new Promise(resolve => setTimeout(resolve, 1000));
                   } catch (e) {
-                    console.log(`   ⚠️ Não foi possível adicionar label:`, e.message);
-                    console.log(`   ⚠️ Pulando envio para evitar duplicatas`);
+                    if (e.message.includes('Not Found') || e.message.includes('deleted')) {
+                      console.log(`     ⚠️ Issue deletada durante processamento - pulando`);
+                      continue;
+                    }
+                    console.log(`     ⚠️ Não foi possível adicionar label:`, e.message);
+                    console.log(`     ⚠️ Pulando envio para evitar duplicatas`);
                     continue; // Se não conseguir adicionar label, não enviar notificação
                   }
                   
@@ -341,18 +397,18 @@ jobs:
                     author: issue.author?.login
                   };
                   
-                  const sent = await sendDiscordNotification(issueData, currentStatus);
+                  const sent = await sendDiscordNotification(issueData, currentStatus, repoInfo);
                   
                   if (sent) {
                     issuesNotified++;
-                    console.log(`   ✓ Notificação enviada com sucesso`);
+                    console.log(`     ✓ Notificação enviada com sucesso`);
                   } else {
                     // Se falhou ao enviar, remover a label para tentar novamente depois
-                    console.log(`   ⚠️ Falha ao enviar notificação, removendo label para retry`);
+                    console.log(`     ⚠️ Falha ao enviar, removendo label para retry`);
                     try {
                       await github.rest.issues.removeLabel({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
+                        owner: repoInfo.owner,
+                        repo: repoInfo.repo,
                         issue_number: issueNumber,
                         name: '🔔 notificado-review'
                       });
@@ -364,6 +420,7 @@ jobs:
                 
                 console.log('\n=== Resumo ===');
                 console.log(`Issues processadas: ${issuesProcessed}`);
+                console.log(`Issues deletadas/inacessíveis: ${issuesDeleted}`);
                 console.log(`Notificações enviadas: ${issuesNotified}`);
                 console.log('=== Finalizado ===');
                 
