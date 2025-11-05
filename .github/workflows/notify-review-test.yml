@@ -1,5 +1,34 @@
 name: Notify Discord on Review/Test
 
+# Este workflow envia notificações ao Discord quando uma issue é movida para a coluna Review/Test
+#
+# CONFIGURAÇÃO NECESSÁRIA:
+# 
+# 1. Secrets do GitHub (Settings > Secrets and variables > Actions):
+#    - DISCORD_WEBHOOK_REVIEW_TEST ou DISCORD_WEBHOOK_URL: URL do webhook do Discord
+#      Como obter: Discord > Configurações do Canal > Integrações > Webhooks > Novo Webhook
+#    
+#    - DISCORD_REVIEW_ROLE_ID (opcional): ID do cargo/role a ser mencionado
+#      Como obter: Discord > Configurações do Servidor > Roles > Clique com botão direito no cargo > Copiar ID
+#      Nota: Você precisa ativar o "Modo Desenvolvedor" nas configurações do Discord para ver esta opção
+#    
+#    - GH_PROJECT_PAT, PROJECT_TOKEN ou PROJECTS_TOKEN: Token de acesso pessoal (PAT)
+#      Necessário se usar eventos projects_v2_item
+#      Como obter: GitHub > Settings > Developer settings > Personal access tokens > Fine-grained tokens
+#      Permissões necessárias: project (read), repo (read), read:org
+#
+# 2. Eventos suportados:
+#    - projects_v2_item: Quando um item é editado no Project v2 (requer webhook na organização)
+#    - issues (labeled): Quando uma label é adicionada a uma issue (fallback)
+#
+# 3. Como usar:
+#    Opção A (Recomendada): Configurar webhook projects_v2_item na organização
+#    Opção B (Fallback): Adicionar label "review/test" ou "Review/Test" às issues manualmente
+#
+# FORMATO DA MENSAGEM NO DISCORD:
+# @Role :mag: Issue movida para Review/Test: [**Título da Issue**](URL)
+#
+
 # Este workflow é acionado quando há mudanças em itens do Project v2
 # ou quando uma issue recebe uma label específica
 on:
