@@ -1,0 +1,224 @@
+name: Move to To Do on Assign
+
+on:
+    issues:
+        types: [assigned]
+
+permissions:
+    issues: write
+    repository-projects: read
+
+jobs:
+    move-to-todo:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Move Issue to To Do
+              uses: actions/github-script@v6
+              env:
+                  PROJECT_ID: "PVT_kwDOCV9Tw84BF9Ag"
+                  PROJECT_OWNER: "austv-minecraft"
+                  TARGET_STATUS: "To Do" # Status de destino
+                  MY_PAT_TOKEN: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
+              with:
+                  github-token: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
+                  script: |
+                      console.log('=== Movendo issue para To Do ao assignar ===\n');
+
+                      const issueNumber = context.payload.issue.number;
+                      const assignee = context.payload.assignee.login;
+                      const issueTitle = context.payload.issue.title;
+
+                      console.log(`Issue #${issueNumber}: ${issueTitle}`);
+                      console.log(`Assignado para: @${assignee}\n`);
+
+                      const token = process.env.MY_PAT_TOKEN;
+                      if (!token) {
+                        core.setFailed('PAT token not configured');
+                        return;
+                      }
+
+                      // Função GraphQL
+                      async function gql(query, variables = {}) {
+                        try {
+                          const response = await github.request('POST /graphql', {
+                            headers: { authorization: `token ${token}` },
+                            data: JSON.stringify({ query, variables })
+                          });
+                          
+                          if (response.data.errors && response.data.errors.length) {
+                            console.log('GraphQL errors:', JSON.stringify(response.data.errors, null, 2));
+                            throw new Error(response.data.errors[0].message || 'GraphQL error');
+                          }
+                          
+                          return response.data;
+                        } catch (error) {
+                          console.log('GraphQL request failed:', error.message);
+                          throw error;
+                        }
+                      }
+
+                      try {
+                        const projectId = process.env.PROJECT_ID;
+                        const targetStatus = process.env.TARGET_STATUS;
+                        
+                        console.log('=== Buscando issue no projeto ===');
+                        
+                        // 1) Obter ID global da issue
+                        const issueData = await github.rest.issues.get({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: issueNumber
+                        });
+                        const issueNodeId = issueData.data.node_id;
+                        console.log(`Issue Node ID: ${issueNodeId}`);
+                        
+                        // 2) Buscar dados do projeto e encontrar a issue
+                        const searchQuery = `
+                          query($projectId: ID!) {
+                            node(id: $projectId) {
+                              ... on ProjectV2 {
+                                title
+                                items(first: 100) {
+                                  nodes {
+                                    id
+                                    content {
+                                      ... on Issue {
+                                        id
+                                        number
+                                        title
+                                      }
+                                    }
+                                    fieldValues(first: 20) {
+                                      nodes {
+                                        ... on ProjectV2ItemFieldSingleSelectValue {
+                                          name
+                                          field {
+                                            ... on ProjectV2SingleSelectField {
+                                              id
+                                              name
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                                fields(first: 20) {
+                                  nodes {
+                                    ... on ProjectV2SingleSelectField {
+                                      id
+                                      name
+                                      options {
+                                        id
+                                        name
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        `;
+                        
+                        const projectData = await gql(searchQuery, { projectId });
+                        const project = projectData.data.node;
+                        
+                        console.log(`✓ Projeto: ${project.title}`);
+                        
+                        // 3) Encontrar o item da issue no projeto
+                        const projectItem = project.items.nodes.find(
+                          item => item.content?.number === issueNumber
+                        );
+                        
+                        if (!projectItem) {
+                          console.log('⚠️ Issue não encontrada no projeto');
+                          console.log('A issue precisa estar no projeto para ser movida.');
+                          return;
+                        }
+                        
+                        console.log(`✓ Issue encontrada no projeto (Item ID: ${projectItem.id})`);
+                        
+                        // Verificar status atual
+                        const currentStatusField = projectItem.fieldValues.nodes.find(
+                          fv => fv.field?.name && (
+                            fv.field.name.toLowerCase().includes('status') ||
+                            fv.field.name.toLowerCase().includes('estado')
+                          )
+                        );
+                        
+                        if (currentStatusField) {
+                          console.log(`Status atual: ${currentStatusField.name}`);
+                        }
+                        
+                        // 4) Encontrar o campo "Status"
+                        const statusField = project.fields.nodes.find(
+                          field => field.name && (
+                            field.name.toLowerCase().includes('status') || 
+                            field.name.toLowerCase().includes('estado')
+                          )
+                        );
+                        
+                        if (!statusField) {
+                          core.setFailed('Campo "Status" não encontrado no projeto');
+                          return;
+                        }
+                        
+                        console.log(`✓ Campo Status encontrado: ${statusField.name}`);
+                        console.log(`Status disponíveis: ${statusField.options.map(o => o.name).join(', ')}`);
+                        
+                        // 5) Encontrar a opção "To Do"
+                        const statusOption = statusField.options.find(
+                          opt => opt.name === targetStatus
+                        );
+                        
+                        if (!statusOption) {
+                          const availableStatuses = statusField.options.map(o => o.name).join(', ');
+                          core.setFailed(`Status "${targetStatus}" não encontrado. Disponíveis: ${availableStatuses}`);
+                          return;
+                        }
+                        
+                        console.log(`✓ Status alvo encontrado: ${statusOption.name} (ID: ${statusOption.id})`);
+                        
+                        // 6) Atualizar o status da issue
+                        console.log('\n=== Movendo issue para To Do ===');
+                        
+                        const updateMutation = `
+                          mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $valueId: String!) {
+                            updateProjectV2ItemFieldValue(
+                              input: {
+                                projectId: $projectId
+                                itemId: $itemId
+                                fieldId: $fieldId
+                                value: { singleSelectOptionId: $valueId }
+                              }
+                            ) {
+                              projectV2Item {
+                                id
+                              }
+                            }
+                          }
+                        `;
+                        
+                        await gql(updateMutation, {
+                          projectId,
+                          itemId: projectItem.id,
+                          fieldId: statusField.id,
+                          valueId: statusOption.id
+                        });
+                        
+                        console.log(`✅ Issue movida de "${currentStatusField?.name || 'Backlog'}" para "${targetStatus}" com sucesso!`);
+                        
+                        // 7) Adicionar comentário na issue (opcional)
+                        await github.rest.issues.createComment({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: issueNumber,
+                          body: `🤖 Issue movida automaticamente de **Backlog** para **To Do** após ser assignada para @${assignee}`
+                        });
+                        
+                        console.log('✅ Comentário adicionado na issue');
+                        
+                      } catch (error) {
+                        core.setFailed(`Erro ao mover issue: ${error.message}`);
+                        console.error('Stack trace:', error.stack);
+                      }
