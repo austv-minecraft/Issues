@@ -74,7 +74,7 @@ jobs:
               }
             }
 
-            // 4) Função para enviar notificação ao Discord
+            // 4) Função para enviar notificação ao Discord usando exec
             async function sendDiscordNotification(issue, status) {
               const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
               if (!webhookUrl) {
@@ -91,7 +91,7 @@ jobs:
                   title: `🔍 ${issue.title}`,
                   url: issue.url,
                   description: `Issue #${issue.number} foi movida para **${status}**`,
-                  color: 0x00ff00,
+                  color: 65280,
                   fields: [
                     {
                       name: 'Autor',
@@ -112,17 +112,20 @@ jobs:
               };
               
               try {
-                const fetch = (await import('node-fetch')).default;
-                const response = await fetch(webhookUrl, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(payload)
-                });
+                // Usar curl via exec ao invés de node-fetch
+                const payloadJson = JSON.stringify(payload);
                 
-                if (!response.ok) {
-                  const errorText = await response.text();
-                  throw new Error(`Discord webhook failed: ${response.status} ${response.statusText} - ${errorText}`);
-                }
+                // Escapar aspas para o shell
+                const escapedPayload = payloadJson.replace(/"/g, '\\"');
+                
+                await exec.exec('curl', [
+                  '-H', 'Content-Type: application/json',
+                  '-d', payloadJson,
+                  webhookUrl
+                ], {
+                  silent: false,
+                  ignoreReturnCode: false
+                });
                 
                 console.log(`✅ Notificação enviada para Discord - Issue #${issue.number}`);
                 return true;
