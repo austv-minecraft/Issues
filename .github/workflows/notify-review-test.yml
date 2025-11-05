@@ -1,0 +1,185 @@
+name: Notify Discord on Review/Test
+
+# Este workflow é acionado quando há mudanças em itens do Project v2
+# ou quando uma issue recebe uma label específica
+on:
+  # Eventos do GitHub Project v2 (requer configuração de webhook na organização)
+  projects_v2_item:
+    types: [edited]
+  # Fallback: usar labels para acionar notificações
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: read
+  repository-projects: read
+
+jobs:
+  notify-discord-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Project Status and Notify
+        id: check_status
+        uses: actions/github-script@v6
+        env:
+          PROJECT_NUMBER: "21"
+          PROJECT_ID: "PVT_kwDOCV9Tw84BF9Ag"
+          PROJECT_OWNER: "austv-minecraft"
+          MY_PAT_TOKEN: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_REVIEW_TEST || secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_ROLE_ID: ${{ secrets.DISCORD_REVIEW_ROLE_ID }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issueNumber = context.payload.issue?.number;
+            const issueTitle = context.payload.issue?.title;
+            const issueUrl = context.payload.issue?.html_url;
+            const issueNodeId = context.payload.issue?.node_id;
+            
+            // Para evento de label, verificar se é relacionado a review/test
+            if (context.eventName === 'issues') {
+              const labelName = context.payload.label?.name?.toLowerCase() || '';
+              if (!labelName.includes('review') && !labelName.includes('test')) {
+                console.log('Label não relacionada a review/test, ignorando.');
+                return;
+              }
+            }
+            
+            // Validar PAT
+            const token = process.env.MY_PAT_TOKEN;
+            if (!token) {
+              console.log('PAT não configurado, tentando abordagem alternativa...');
+              // Sem PAT, usar apenas informações da issue
+              if (context.eventName === 'issues' && issueNumber && issueTitle) {
+                await sendDiscordNotification(issueNumber, issueTitle, issueUrl);
+              }
+              return;
+            }
+            
+            // Função auxiliar para GraphQL
+            async function gql(query, variables = {}) {
+              const response = await github.request('POST /graphql', {
+                headers: { authorization: `token ${token}` },
+                data: JSON.stringify({ query, variables })
+              });
+              
+              if (response.data.errors && response.data.errors.length) {
+                console.log('GraphQL errors:', JSON.stringify(response.data.errors, null, 2));
+                throw new Error(response.data.errors[0].message || 'GraphQL error');
+              }
+              
+              return response.data;
+            }
+            
+            // Função para enviar notificação ao Discord
+            async function sendDiscordNotification(issueNum, title, url) {
+              const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+              if (!webhookUrl) {
+                console.log('DISCORD_WEBHOOK_URL não configurado, pulando notificação.');
+                return;
+              }
+              
+              const roleId = process.env.DISCORD_ROLE_ID;
+              const roleMention = roleId ? `<@&${roleId}> ` : '';
+              
+              const message = `${roleMention}:mag: Issue movida para Review/Test: [**${title}**](${url})`;
+              
+              try {
+                const fetch = (await import('node-fetch')).default;
+                const response = await fetch(webhookUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ content: message })
+                });
+                
+                if (response.ok) {
+                  console.log('Notificação enviada para Discord com sucesso!');
+                } else {
+                  console.log('Erro ao enviar notificação:', response.status, response.statusText);
+                }
+              } catch (error) {
+                console.log('Erro ao enviar notificação para Discord:', error.message);
+              }
+            }
+            
+            // Se for evento de projects_v2_item, verificar o status
+            if (context.eventName === 'projects_v2_item') {
+              try {
+                const projectId = process.env.PROJECT_ID;
+                const itemId = context.payload.projects_v2_item?.node_id;
+                
+                if (!itemId) {
+                  console.log('Item node_id não encontrado no payload.');
+                  return;
+                }
+                
+                // Buscar detalhes do item do projeto
+                const itemQuery = `
+                  query($itemId: ID!) {
+                    node(id: $itemId) {
+                      ... on ProjectV2Item {
+                        id
+                        content {
+                          ... on Issue {
+                            number
+                            title
+                            url
+                          }
+                        }
+                        fieldValues(first: 10) {
+                          nodes {
+                            ... on ProjectV2ItemFieldSingleSelectValue {
+                              name
+                              field {
+                                ... on ProjectV2SingleSelectField {
+                                  name
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                `;
+                
+                const itemRes = await gql(itemQuery, { itemId });
+                const item = itemRes?.data?.node;
+                
+                if (!item || !item.content) {
+                  console.log('Item ou conteúdo não encontrado.');
+                  return;
+                }
+                
+                const issue = item.content;
+                const fieldValues = item.fieldValues?.nodes || [];
+                
+                // Procurar por campo de Status com valor "Review/Test"
+                let isReviewTest = false;
+                for (const fieldValue of fieldValues) {
+                  const fieldName = fieldValue.field?.name?.toLowerCase() || '';
+                  const valueName = fieldValue.name?.toLowerCase() || '';
+                  
+                  console.log(`Campo: ${fieldName}, Valor: ${valueName}`);
+                  
+                  if ((fieldName.includes('status') || fieldName.includes('estado')) &&
+                      (valueName.includes('review') && valueName.includes('test'))) {
+                    isReviewTest = true;
+                    break;
+                  }
+                }
+                
+                if (isReviewTest) {
+                  console.log('Issue movida para Review/Test!');
+                  await sendDiscordNotification(issue.number, issue.title, issue.url);
+                } else {
+                  console.log('Issue não está em Review/Test.');
+                }
+              } catch (error) {
+                console.log('Erro ao verificar status do projeto:', error.message);
+              }
+            } else if (context.eventName === 'issues' && issueNumber && issueTitle && issueUrl) {
+              // Para eventos de issues com label, enviar notificação diretamente
+              console.log('Enviando notificação baseada em label...');
+              await sendDiscordNotification(issueNumber, issueTitle, issueUrl);
+            }
