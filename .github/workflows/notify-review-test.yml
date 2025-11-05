@@ -108,11 +108,6 @@ jobs:
                   color: 65280,
                   fields: [
                     {
-                      name: 'Repositório',
-                      value: `${repoInfo.owner}/${repoInfo.repo}`,
-                      inline: true
-                    },
-                    {
                       name: 'Autor',
                       value: issue.author || 'Desconhecido',
                       inline: true
@@ -123,9 +118,6 @@ jobs:
                       inline: true
                     }
                   ],
-                  footer: {
-                    text: `${repoInfo.owner}/${repoInfo.repo}`
-                  },
                   timestamp: new Date().toISOString()
                 }]
               };
