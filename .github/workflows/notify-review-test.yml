@@ -1,16 +1,14 @@
 name: Notify Discord on Review/Test
 
 on:
-  issues:
-    types: [opened, reopened, edited, labeled, unlabeled]
+  # Verificar a cada 5 minutos se há issues em Review/Test não notificadas
+  schedule:
+    - cron: "*/5 * * * *"
+  # Também permite execução manual
   workflow_dispatch:
-    inputs:
-      issue_number:
-        description: "Issue number to check (for manual testing)"
-        required: false
 
 permissions:
-  issues: read
+  issues: write
   repository-projects: read
 
 jobs:
@@ -29,24 +27,9 @@ jobs:
         with:
           github-token: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
           script: |
-            // 1) Validar payload e obter informações da issue
-            const issueNumber = core.getInput('issue_number') || context.payload.issue?.number;
-            const issueNodeId = context.payload.issue?.node_id;
-            const issueTitle = context.payload.issue?.title;
-            const issueUrl = context.payload.issue?.html_url;
-            const issueAuthor = context.payload.issue?.user?.login;
+            console.log('=== Iniciando verificação de issues em Review/Test ===\n');
 
-            if (!issueNumber) {
-              console.log('Issue number not found in payload.');
-              return;
-            }
-
-            console.log(`\n=== Processando Issue #${issueNumber} ===`);
-            console.log(`Título: ${issueTitle}`);
-            console.log(`Autor: ${issueAuthor}`);
-            console.log(`URL: ${issueUrl}`);
-
-            // 2) Validar disponibilidade do PAT
+            // 1) Validar disponibilidade do PAT
             const token = process.env.MY_PAT_TOKEN;
             if (!token) {
               core.setFailed('MY_PAT_TOKEN secret is not set. Provide GH_PROJECT_PAT, PROJECT_TOKEN or PROJECTS_TOKEN with project/repo/read:org permissions.');
@@ -54,7 +37,7 @@ jobs:
             }
             console.log('✓ PAT Token present');
 
-            // 2.1) Diagnóstico: identidade do PAT
+            // 2) Diagnóstico: identidade do PAT
             try {
               const viewerRes = await github.request('POST /graphql', {
                 headers: { authorization: `token ${token}` },
@@ -64,7 +47,8 @@ jobs:
               console.log('✓ PAT viewer.login:', viewer?.login || 'unknown');
               
               if (viewer?.login === 'github-actions[bot]') {
-                core.warning('WARNING: Using GITHUB_TOKEN instead of PROJECT_TOKEN! The workflow may not have access to project data.');
+                core.setFailed('ERRO: Usando GITHUB_TOKEN ao invés de PROJECT_TOKEN! Configure o secret GH_PROJECT_PAT.');
+                return;
               }
             } catch (e) {
               console.log('Warning: viewer query failed:', e.message);
@@ -91,7 +75,7 @@ jobs:
             }
 
             // 4) Função para enviar notificação ao Discord
-            async function sendDiscordNotification(status) {
+            async function sendDiscordNotification(issue, status) {
               const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
               if (!webhookUrl) {
                 console.log('⚠️ DISCORD_WEBHOOK_URL não configurado.');
@@ -104,14 +88,14 @@ jobs:
               const payload = {
                 content: `${roleMention} Nova issue para revisão/teste!`,
                 embeds: [{
-                  title: `🔍 ${issueTitle}`,
-                  url: issueUrl,
-                  description: `Issue #${issueNumber} foi movida para **${status}**`,
+                  title: `🔍 ${issue.title}`,
+                  url: issue.url,
+                  description: `Issue #${issue.number} foi movida para **${status}**`,
                   color: 0x00ff00,
                   fields: [
                     {
                       name: 'Autor',
-                      value: issueAuthor || 'Desconhecido',
+                      value: issue.author || 'Desconhecido',
                       inline: true
                     },
                     {
@@ -140,10 +124,10 @@ jobs:
                   throw new Error(`Discord webhook failed: ${response.status} ${response.statusText} - ${errorText}`);
                 }
                 
-                console.log('✅ Notificação enviada para Discord com sucesso!');
+                console.log(`✅ Notificação enviada para Discord - Issue #${issue.number}`);
                 return true;
               } catch (error) {
-                console.log('❌ Erro ao enviar notificação para Discord:', error.message);
+                console.log(`❌ Erro ao enviar notificação para Discord - Issue #${issue.number}:`, error.message);
                 return false;
               }
             }
@@ -211,11 +195,11 @@ jobs:
                 
                 console.log(`✓ Target Project: ${projNode.title} (#${projNode.number})`);
 
-                // 6) Buscar item da issue no projeto
-                console.log('\n=== Buscando Issue no Projeto ===');
+                // 6) Buscar TODOS os itens do projeto
+                console.log('\n=== Buscando Issues no Projeto ===');
                 
                 const itemsQuery = `
-                  query($projectId: ID!, $issueNodeId: ID!) {
+                  query($projectId: ID!) {
                     node(id: $projectId) {
                       ... on ProjectV2 {
                         items(first: 100) {
@@ -225,6 +209,16 @@ jobs:
                               ... on Issue {
                                 id
                                 number
+                                title
+                                url
+                                author {
+                                  login
+                                }
+                                labels(first: 20) {
+                                  nodes {
+                                    name
+                                  }
+                                }
                               }
                             }
                             fieldValues(first: 20) {
@@ -248,105 +242,94 @@ jobs:
                   }
                 `;
                 
-                const itemsRes = await gql(itemsQuery, { projectId, issueNodeId });
+                const itemsRes = await gql(itemsQuery, { projectId });
                 const items = itemsRes?.data?.node?.items?.nodes || [];
                 
                 console.log(`Total de itens no projeto: ${items.length}`);
                 
-                // Encontrar o item correspondente
-                const item = items.find(i => i.content?.number === issueNumber);
+                // 7) Processar cada item e verificar se está em Review/Test
+                let issuesProcessed = 0;
+                let issuesNotified = 0;
                 
-                if (!item) {
-                  console.log(`⚠️ Issue #${issueNumber} não encontrada no projeto.`);
-                  console.log('A issue precisa estar adicionada ao projeto para verificar seu status.');
-                  return;
-                }
-                
-                console.log(`✓ Issue encontrada no projeto! Item ID: ${item.id}`);
-
-                // 7) Verificar campos e status
-                console.log('\n=== Verificando Status ===');
-                
-                const fieldValues = item.fieldValues?.nodes || [];
-                console.log(`Campos encontrados: ${fieldValues.length}`);
-                
-                let currentStatus = null;
-                let statusFieldName = null;
-                
-                for (const fieldValue of fieldValues) {
-                  const fieldName = fieldValue.field?.name || '';
-                  const valueName = fieldValue.name || '';
-                  
-                  console.log(`  Campo: "${fieldName}" = "${valueName}"`);
-                  
-                  // Procurar por campo de Status
-                  if (fieldName.toLowerCase().includes('status') || 
-                      fieldName.toLowerCase().includes('estado')) {
-                    currentStatus = valueName;
-                    statusFieldName = fieldName;
-                    console.log(`  ↳ ✓ Campo de status identificado!`);
+                for (const item of items) {
+                  if (!item.content || !item.content.number) {
+                    continue; // Não é uma issue
                   }
-                }
-                
-                if (!currentStatus) {
-                  console.log('⚠️ Campo de status não encontrado para esta issue.');
-                  return;
-                }
-                
-                console.log(`\nStatus atual: "${currentStatus}"`);
-                
-                // 8) Verificar se está em Review/Test
-                const statusLower = currentStatus.toLowerCase();
-                const isReviewTest = statusLower.includes('review') && statusLower.includes('test');
-                
-                if (isReviewTest) {
-                  console.log('\n🎯 Issue está em Review/Test!');
                   
-                  // Verificar se já foi notificado (label)
-                  const labels = context.payload.issue?.labels || [];
+                  issuesProcessed++;
+                  const issue = item.content;
+                  const fieldValues = item.fieldValues?.nodes || [];
+                  
+                  // Buscar status atual
+                  let currentStatus = null;
+                  for (const fieldValue of fieldValues) {
+                    const fieldName = fieldValue.field?.name || '';
+                    const valueName = fieldValue.name || '';
+                    
+                    if (fieldName.toLowerCase().includes('status') || 
+                        fieldName.toLowerCase().includes('estado')) {
+                      currentStatus = valueName;
+                      break;
+                    }
+                  }
+                  
+                  if (!currentStatus) {
+                    continue; // Sem status definido
+                  }
+                  
+                  // Verificar se está em Review/Test
+                  const statusLower = currentStatus.toLowerCase();
+                  const isReviewTest = statusLower.includes('review') && statusLower.includes('test');
+                  
+                  if (!isReviewTest) {
+                    continue; // Não está em Review/Test
+                  }
+                  
+                  // Verificar se já foi notificado
+                  const labels = issue.labels?.nodes || [];
                   const alreadyNotified = labels.some(l => l.name === '🔔 notificado-review');
                   
-                  if (alreadyNotified && context.eventName !== 'workflow_dispatch') {
-                    console.log('ℹ️ Notificação já enviada anteriormente (label presente).');
-                    return;
+                  if (alreadyNotified) {
+                    console.log(`  Issue #${issue.number} - Já notificada (pulando)`);
+                    continue;
                   }
                   
-                  // Enviar notificação
-                  const sent = await sendDiscordNotification(currentStatus);
+                  // Issue em Review/Test e não notificada - enviar notificação!
+                  console.log(`\n🎯 Issue #${issue.number} encontrada em Review/Test (não notificada)`);
+                  console.log(`   Título: ${issue.title}`);
+                  console.log(`   Status: ${currentStatus}`);
+                  
+                  const issueData = {
+                    number: issue.number,
+                    title: issue.title,
+                    url: issue.url,
+                    author: issue.author?.login
+                  };
+                  
+                  const sent = await sendDiscordNotification(issueData, currentStatus);
                   
                   if (sent) {
+                    issuesNotified++;
+                    
                     // Adicionar label para evitar duplicatas
                     try {
                       await github.rest.issues.addLabels({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
-                        issue_number: issueNumber,
+                        issue_number: issue.number,
                         labels: ['🔔 notificado-review']
                       });
-                      console.log('✓ Label "🔔 notificado-review" adicionada.');
+                      console.log(`   ✓ Label "🔔 notificado-review" adicionada à issue #${issue.number}`);
                     } catch (e) {
-                      console.log('⚠️ Não foi possível adicionar label:', e.message);
+                      console.log(`   ⚠️ Não foi possível adicionar label à issue #${issue.number}:`, e.message);
                     }
-                  }
-                } else {
-                  console.log(`\nℹ️ Issue não está em Review/Test.`);
-                  console.log(`   Status atual: "${currentStatus}"`);
-                  
-                  // Remover label se existir
-                  try {
-                    await github.rest.issues.removeLabel({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      issue_number: issueNumber,
-                      name: '🔔 notificado-review'
-                    });
-                    console.log('✓ Label "🔔 notificado-review" removida.');
-                  } catch (e) {
-                    // Label não existe, ignorar
                   }
                 }
                 
-                console.log('\n=== Finalizado ===');
+                console.log('\n=== Resumo ===');
+                console.log(`Issues processadas: ${issuesProcessed}`);
+                console.log(`Notificações enviadas: ${issuesNotified}`);
+                console.log('=== Finalizado ===');
                 
               } catch (e) {
                 core.setFailed(`Failed to check project status: ${e.message || e}`);
