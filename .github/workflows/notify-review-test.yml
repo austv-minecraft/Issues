@@ -25,7 +25,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_REVIEW_TEST || secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_ROLE_ID: ${{ secrets.DISCORD_REVIEW_ROLE_ID || secrets.DISCORD_ROLE_ID }}
         with:
-          github-token: ${{ secrets.GH_PROJECT_PAT || secrets.PROJECT_TOKEN || secrets.PROJECTS_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             console.log('=== Iniciando verificação de issues em Review/Test ===\n');
 
@@ -112,11 +112,7 @@ jobs:
               };
               
               try {
-                // Usar curl via exec ao invés de node-fetch
                 const payloadJson = JSON.stringify(payload);
-                
-                // Escapar aspas para o shell
-                const escapedPayload = payloadJson.replace(/"/g, '\\"');
                 
                 await exec.exec('curl', [
                   '-H', 'Content-Type: application/json',
@@ -261,6 +257,24 @@ jobs:
                   
                   issuesProcessed++;
                   const issue = item.content;
+                  const issueNumber = issue.number;
+                  
+                  // VERIFICAÇÃO DUPLA: Buscar labels diretamente da API para garantir dados atualizados
+                  let issueLabels = [];
+                  try {
+                    const issueData = await github.rest.issues.get({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issueNumber
+                    });
+                    issueLabels = issueData.data.labels.map(l => l.name);
+                    console.log(`Issue #${issueNumber} - Labels atuais: [${issueLabels.join(', ')}]`);
+                  } catch (e) {
+                    console.log(`⚠️ Erro ao buscar labels da issue #${issueNumber}:`, e.message);
+                    // Fallback para labels do GraphQL
+                    issueLabels = (issue.labels?.nodes || []).map(l => l.name);
+                  }
+                  
                   const fieldValues = item.fieldValues?.nodes || [];
                   
                   // Buscar status atual
@@ -288,22 +302,40 @@ jobs:
                     continue; // Não está em Review/Test
                   }
                   
-                  // Verificar se já foi notificado
-                  const labels = issue.labels?.nodes || [];
-                  const alreadyNotified = labels.some(l => l.name === '🔔 notificado-review');
+                  // Verificar se já foi notificado (usando labels atualizadas)
+                  const alreadyNotified = issueLabels.includes('🔔 notificado-review');
                   
                   if (alreadyNotified) {
-                    console.log(`  Issue #${issue.number} - Já notificada (pulando)`);
+                    console.log(`  Issue #${issueNumber} - Já notificada (pulando)`);
                     continue;
                   }
                   
-                  // Issue em Review/Test e não notificada - enviar notificação!
-                  console.log(`\n🎯 Issue #${issue.number} encontrada em Review/Test (não notificada)`);
+                  // Issue em Review/Test e não notificada
+                  console.log(`\n🎯 Issue #${issueNumber} encontrada em Review/Test (não notificada)`);
                   console.log(`   Título: ${issue.title}`);
                   console.log(`   Status: ${currentStatus}`);
                   
+                  // ADICIONAR LABEL ANTES de enviar notificação (prevenir duplicatas)
+                  try {
+                    await github.rest.issues.addLabels({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: issueNumber,
+                      labels: ['🔔 notificado-review']
+                    });
+                    console.log(`   ✓ Label "🔔 notificado-review" adicionada (PRÉ-ENVIO)`);
+                    
+                    // Pequeno delay para garantir que a label foi adicionada
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                  } catch (e) {
+                    console.log(`   ⚠️ Não foi possível adicionar label:`, e.message);
+                    console.log(`   ⚠️ Pulando envio para evitar duplicatas`);
+                    continue; // Se não conseguir adicionar label, não enviar notificação
+                  }
+                  
+                  // Agora enviar notificação
                   const issueData = {
-                    number: issue.number,
+                    number: issueNumber,
                     title: issue.title,
                     url: issue.url,
                     author: issue.author?.login
@@ -313,18 +345,19 @@ jobs:
                   
                   if (sent) {
                     issuesNotified++;
-                    
-                    // Adicionar label para evitar duplicatas
+                    console.log(`   ✓ Notificação enviada com sucesso`);
+                  } else {
+                    // Se falhou ao enviar, remover a label para tentar novamente depois
+                    console.log(`   ⚠️ Falha ao enviar notificação, removendo label para retry`);
                     try {
-                      await github.rest.issues.addLabels({
+                      await github.rest.issues.removeLabel({
                         owner: context.repo.owner,
                         repo: context.repo.repo,
-                        issue_number: issue.number,
-                        labels: ['🔔 notificado-review']
+                        issue_number: issueNumber,
+                        name: '🔔 notificado-review'
                       });
-                      console.log(`   ✓ Label "🔔 notificado-review" adicionada à issue #${issue.number}`);
                     } catch (e) {
-                      console.log(`   ⚠️ Não foi possível adicionar label à issue #${issue.number}:`, e.message);
+                      // Ignorar erro ao remover
                     }
                   }
                 }
